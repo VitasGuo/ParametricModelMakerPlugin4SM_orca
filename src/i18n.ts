@@ -7,6 +7,8 @@
  * without losing the current project / compile state).
  */
 
+import { logger } from './core/logger.js';
+
 export type Lang = 'zh' | 'en';
 
 const STORAGE_KEY = 'model-lab-web:lang';
@@ -14,14 +16,28 @@ const STORAGE_KEY = 'model-lab-web:lang';
 const en: Record<string, string> = {
   // topbar / common
   'AI 参数化模型': 'AI Parametric Model',
+  文件: 'File',
+  视图: 'View',
+  帮助: 'Help',
   新建: 'New',
+  新建项目: 'New Project',
   打开: 'Open',
+  '打开…': 'Open…',
   保存: 'Save',
+  保存项目: 'Save Project',
+  '保存当前版本到历史': 'Save Version to History',
+  '历史版本…': 'History…',
   导出: 'Export',
   '导出 STL': 'Export STL',
   '导出 3MF': 'Export 3MF',
   '导出 .scad（含当前参数）': 'Export .scad (with current params)',
   '导出项目 JSON': 'Export project JSON',
+  '3D 预览': '3D Preview',
+  源代码: 'Source Code',
+  '可直接编辑，Ctrl/⌘ + S 保存项目': 'Editable · Ctrl/⌘ + S saves the project',
+  运行日志: 'Logs',
+  关于: 'About',
+  'SCAD 源码': 'SCAD Source',
   范例: 'Examples',
   设置: 'Settings',
   代码: 'Code',
@@ -126,6 +142,31 @@ const en: Record<string, string> = {
   '导出全部 STL': 'Export all STL',
   没有可导出的变体: 'No variants to export',
 
+  // logs / history / about
+  信息: 'Info',
+  警告: 'Warnings',
+  错误: 'Errors',
+  复制: 'Copy',
+  '导出 .log': 'Export .log',
+  '暂无日志。': 'No logs yet.',
+  日志已复制: 'Logs copied',
+  日志已清空: 'Logs cleared',
+  历史版本: 'History',
+  'AI 生成': 'AI generated',
+  手动保存: 'Manual save',
+  项目快照: 'Project snapshot',
+  清空历史: 'Clear history',
+  '历史版本已清空': 'History cleared',
+  '当前代码已在历史中': 'This code is already in history',
+  '还没有历史版本。AI 生成、载入范例时会自动命名保存；也可以在「文件 → 保存当前版本到历史」手动快照。':
+    'No history yet. AI generations and loaded examples are auto-named and saved; you can also use File → Save Version to History for a manual snapshot.',
+  版本: 'Version',
+  开发者: 'Developer',
+  许可证: 'License',
+  仓库: 'Repository',
+  '用自然语言生成可打印的 OpenSCAD 参数化模型：浏览器内真实编译、3D 预览、调参、导出 STL / 3MF。':
+    'Generate printable OpenSCAD parametric models from natural language: real in-browser compilation, 3D preview, parameter tuning, STL / 3MF export.',
+
   // settings
   模型设置: 'Model Settings',
   保存设置: 'Save settings',
@@ -207,6 +248,9 @@ const en: Record<string, string> = {
 };
 
 const patterns: Array<[RegExp, string]> = [
+  [/^AI 参数化模型 v(.+)$/, 'AI Parametric Model v$1'],
+  [/^开发者 (.+) · GPL-2\.0$/, 'Developer $1 · GPL-2.0'],
+  [/^已保存历史版本「(.+)」$/, 'Saved history version “$1”'],
   [/^已载入「(.+)」$/, 'Loaded “$1”'],
   [/^已载入范例：(.+)$/, 'Loaded example: $1'],
   [/^已打开「(.+)」$/, 'Opened “$1”'],
@@ -263,6 +307,7 @@ export function toggleLang(): void {
   document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
   applyTranslations();
   updateLangToggles();
+  logger.info('i18n', `切换语言：${lang === 'zh' ? '中文' : 'English'}`);
 }
 
 export function langToggleLabel(): string {
@@ -372,7 +417,8 @@ function translateAttributes(element: Element): void {
 
 function shouldSkip(element: Element): boolean {
   return !!element.closest(
-    'code, pre, textarea, script, style, .cm-editor, .cm-content, .msg.user, .param-name, .param-desc, .param-group-title, [data-i18n-skip]'
+    'code, pre, textarea, script, style, .cm-editor, .cm-content, .msg.user, .param-name, .param-desc, ' +
+      '.param-group-title, .log-list, .history-head strong, .history-note, .history-meta, [data-i18n-skip]'
   );
 }
 

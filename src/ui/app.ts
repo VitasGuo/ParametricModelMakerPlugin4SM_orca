@@ -21,6 +21,9 @@ import {
 import { getCjkFont, initCjkFont } from '../storage/fonts.js';
 import { Store, type AppState, type ChatEntry } from '../state/store.js';
 import { langToggleLabel, toggleLang } from '../i18n.js';
+import { logger } from '../core/logger.js';
+import { autoNameSource, pushHistory } from '../storage/history.js';
+import { APP_AUTHOR, APP_VERSION } from '../version.js';
 import { Viewer, type ViewName } from '../viewer/viewer.js';
 import { CodeEditor } from '../editor/editor.js';
 import { ChatPanel } from './chat.js';
@@ -30,6 +33,9 @@ import { openSettingsModal } from './settings.js';
 import { openExamplesModal } from './examples.js';
 import { openProjectsModal } from './projects.js';
 import { openBatchModal } from './batch.js';
+import { openHistoryModal } from './history.js';
+import { openLogsModal } from './logs.js';
+import { openAboutModal } from './about.js';
 import { toast } from './toast.js';
 
 export class App {
@@ -44,9 +50,13 @@ export class App {
   private readonly configBadge: HTMLButtonElement;
   private readonly dimensions: HTMLElement;
   private readonly emptyOverlay: HTMLElement;
-  private readonly codeDrawer: HTMLElement;
+  private readonly codePane: HTMLElement;
+  private readonly viewerEl: HTMLElement;
+  private readonly mainEl: HTMLElement;
   private readonly codeStatus: HTMLElement;
   private readonly codeLog: HTMLElement;
+  private readonly previewTab: HTMLButtonElement;
+  private readonly codeTab: HTMLButtonElement;
 
   private config: WebModelConfig | null = loadConfig();
   private lastOutput: ArrayBuffer | null = null;
@@ -57,7 +67,7 @@ export class App {
     root.replaceChildren();
     root.className = 'app';
 
-    // ---------- topbar ----------
+    // ---------- topbar（macOS 风格：左侧菜单 / 居中标题 / 右侧状态） ----------
     this.projectName = el('input', 'project-name');
     this.projectName.value = this.store.state.project.name;
     this.projectName.addEventListener('change', () => this.store.renameProject(this.projectName.value));
@@ -68,40 +78,55 @@ export class App {
     this.configBadge.type = 'button';
     this.configBadge.addEventListener('click', () => this.openSettings());
 
-    const fileButton = button('文件', 'btn', () => this.toggleMenu());
-    const exportMenu = el('div', 'menu');
-    exportMenu.style.display = 'none';
-    exportMenu.append(
-      menuItem('新建', () => this.newProject()),
-      menuItem('打开', () => this.openProjects()),
-      menuItem('保存', () => this.saveCurrent()),
-      menuItem('导出 STL', () => this.exportStl()),
-      menuItem('导出 3MF', () => void this.export3mf()),
-      menuItem('导出 .scad（含当前参数）', () => this.exportScad()),
-      menuItem('导出项目 JSON', () => downloadProjectJson(this.store.state.project))
-    );
-    const menuWrap = el('div', 'menu-wrap', [fileButton, exportMenu]);
-    this.exportMenu = exportMenu;
-    document.addEventListener('click', (event) => {
-      if (!menuWrap.contains(event.target as Node)) exportMenu.style.display = 'none';
-    });
+    const brandIcon = el('img', 'brand-mark', []);
+    brandIcon.src = './icon.svg';
+    brandIcon.alt = '';
+
+    const menuBar = el('div', 'menubar', [
+      buildMenu('文件', [
+        { label: '新建项目', action: () => this.newProject() },
+        { label: '打开…', action: () => this.openProjects() },
+        { label: '保存项目', action: () => this.saveCurrent() },
+        { label: '保存当前版本到历史', action: () => this.snapshotCurrent() },
+        { label: '历史版本…', action: () => this.openHistory() },
+        'divider',
+        { label: '导出 STL', action: () => this.exportStl() },
+        { label: '导出 3MF', action: () => void this.export3mf() },
+        { label: '导出 .scad（含当前参数）', action: () => this.exportScad() },
+        { label: '导出项目 JSON', action: () => downloadProjectJson(this.store.state.project) },
+      ]),
+      buildMenu('视图', [
+        { label: '3D 预览', action: () => this.store.setCodeOpen(false) },
+        { label: '源代码', action: () => this.store.setCodeOpen(true) },
+        'divider',
+        { label: '重新编译', action: () => this.store.compileNow() },
+        { label: '线框', action: () => this.toggleWireframe() },
+        { label: '截图', action: () => void this.saveScreenshot() },
+      ]),
+      buildMenu('帮助', [
+        { label: '运行日志', action: () => openLogsModal() },
+        { label: '关于', action: () => openAboutModal() },
+      ]),
+    ]);
 
     const langBtn = button(langToggleLabel(), 'btn', () => toggleLang());
     langBtn.setAttribute('data-lang-toggle', '');
     langBtn.setAttribute('data-i18n-skip', '');
 
     const topbar = el('div', 'topbar', [
-      el('div', 'brand', [el('div', 'brand-mark', ['PM']), el('span', '', ['AI 参数化模型'])]),
-      this.projectName,
-      this.configBadge,
-      this.statusBadge,
-      el('span', 'topbar-spacer'),
+      el('div', 'traffic', [
+        trafficDot('close', '新建项目', () => this.newProject()),
+        trafficDot('min', '保存项目', () => this.saveCurrent()),
+        trafficDot('zoom', '导出 STL', () => this.exportStl()),
+      ]),
+      el('div', 'brand', [brandIcon, el('span', 'brand-name', ['AI 参数化模型'])]),
+      menuBar,
+      el('div', 'topbar-center', [this.projectName]),
       el('div', 'topbar-group', [
-        menuWrap,
-        button('范例', 'btn', () => this.openExamples()),
-        button('设置', 'btn', () => this.openSettings()),
+        this.configBadge,
+        this.statusBadge,
         langBtn,
-        button('代码', 'btn', () => this.store.toggleCode()),
+        iconButton('gear', '设置', () => this.openSettings()),
       ]),
     ]);
 
@@ -122,27 +147,55 @@ export class App {
     ]);
     const viewerCanvas = el('div', 'viewer-canvas');
     this.emptyOverlay = el('div', 'viewer-empty', [this.buildEmptyCard()]);
-    const viewerEl = el('div', 'viewer', [viewerCanvas, toolbar, this.dimensions, this.emptyOverlay]);
+    this.viewerEl = el('div', 'viewer', [viewerCanvas, toolbar, this.dimensions, this.emptyOverlay]);
+
+    // ---------- center tabs + code pane ----------
+    this.codeStatus = el('span', 'badge', ['']);
+    const codeEditorEl = el('div', 'code-editor');
+    this.codeLog = el('div', 'code-log');
+    this.codePane = el('div', 'code-pane hidden', [
+      el('div', 'code-head', [
+        el('span', 'panel-title', ['SCAD 源码']),
+        this.codeStatus,
+        el('span', 'spacer'),
+        el('span', 'code-hint', ['可直接编辑，Ctrl/⌘ + S 保存项目']),
+      ]),
+      codeEditorEl,
+      this.codeLog,
+    ]);
+
+    this.previewTab = this.centerTab('3D 预览', false);
+    this.codeTab = this.centerTab('源代码', true);
+    const center = el('div', 'center', [
+      el('div', 'center-tabs', [this.previewTab, this.codeTab]),
+      this.viewerEl,
+      this.codePane,
+    ]);
 
     // ---------- panels ----------
     const left = el('div', 'panel panel-left');
     const right = el('div', 'panel panel-right');
 
-    // ---------- code drawer ----------
-    this.codeDrawer = el('div', 'code-drawer hidden');
-    this.codeStatus = el('span', 'badge', ['']);
-    const codeEditorEl = el('div', 'code-editor');
-    this.codeLog = el('div', 'code-log');
-    const codeHead = el('div', 'code-head', [
-      el('span', 'panel-title', ['SCAD 源码']),
-      this.codeStatus,
-      el('span', 'topbar-spacer'),
-      button('关闭', 'btn btn-sm btn-ghost', () => this.store.setCodeOpen(false)),
+    this.mainEl = el('div', 'main', [left, center, right]);
+    const footer = el('div', 'statusbar', [
+      el('span', '', [`AI 参数化模型 v${APP_VERSION}`]),
+      el('span', 'spacer'),
+      el('span', '', [`开发者 ${APP_AUTHOR} · GPL-2.0`]),
     ]);
-    this.codeDrawer.append(codeHead, codeEditorEl, this.codeLog);
+    root.append(topbar, this.mainEl, footer);
 
-    const main = el('div', 'main', [left, viewerEl, right]);
-    root.append(topbar, main, this.codeDrawer);
+    // 快捷键：Ctrl/Cmd + S 保存项目，Ctrl/Cmd + O 打开项目
+    document.addEventListener('keydown', (event) => {
+      if (!event.ctrlKey && !event.metaKey) return;
+      const key = event.key.toLowerCase();
+      if (key === 's') {
+        event.preventDefault();
+        this.saveCurrent();
+      } else if (key === 'o') {
+        event.preventDefault();
+        this.openProjects();
+      }
+    });
 
     this.viewer = new Viewer(viewerCanvas);
     this.editor = new CodeEditor({
@@ -169,12 +222,12 @@ export class App {
     if (!this.config?.apiKey) {
       this.store.addChat({
         role: 'system',
-        text: '尚未配置模型：点右上角「设置」填入 Provider / 模型 / API Key。纯静态网页，Key 只存在本机浏览器。',
+        text: '尚未配置模型：点右上角齿轮「设置」填入 Provider / 模型 / API Key。纯静态网页，Key 只存在本机浏览器。',
       });
     }
-  }
 
-  private readonly exportMenu: HTMLElement;
+    logger.info('app', '应用启动', `v${APP_VERSION} · ${APP_AUTHOR}`);
+  }
 
   private onState(state: AppState): void {
     if (document.activeElement !== this.projectName) this.projectName.value = state.project.name;
@@ -197,7 +250,7 @@ export class App {
     this.updateStatus(state);
     this.updateViewer(state);
     this.updateEditor(state);
-    this.updateCodeDrawer(state);
+    this.updateCenterView(state);
     this.paramPanel.render(state);
     this.chatPanel.render(state);
 
@@ -271,8 +324,12 @@ export class App {
     }
   }
 
-  private updateCodeDrawer(state: AppState): void {
-    this.codeDrawer.classList.toggle('hidden', !state.codeOpen);
+  private updateCenterView(state: AppState): void {
+    this.previewTab.classList.toggle('active', !state.codeOpen);
+    this.codeTab.classList.toggle('active', state.codeOpen);
+    this.codePane.classList.toggle('hidden', !state.codeOpen);
+    this.viewerEl.classList.toggle('pane-hidden', state.codeOpen);
+    this.mainEl.classList.toggle('code-mode', state.codeOpen);
     if (state.codeOpen && !this.codeWasOpen) {
       requestAnimationFrame(() => this.editor.requestMeasure());
     }
@@ -347,6 +404,12 @@ export class App {
 
   private async runAi(userMessage: string, reroll?: RerollContext): Promise<void> {
     if (!this.config) return;
+    const started = performance.now();
+    logger.info(
+      'ai',
+      reroll ? '按验证反馈重抽' : 'AI 生成请求',
+      `${this.config.provider}/${this.config.model} · ${userMessage.length} 字符`
+    );
     const history = this.store.aiHistory();
     if (reroll) {
       this.store.addChat({ role: 'system', text: '按验证反馈重抽…' });
@@ -374,10 +437,17 @@ export class App {
       const response = await chat(request, this.config, (candidate, values) =>
         verifyScad(candidate, values, { screenshot: true })
       );
+      logger.info(
+        'ai',
+        'AI 响应完成',
+        `${response.action?.type ?? 'error'} · ${Math.round(performance.now() - started)} ms · ` +
+          `${response.verification?.status ?? '未验证'}`
+      );
       this.appendAiResponse(response);
       this.applyAction(response);
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
+      logger.error('ai', 'AI 调用失败', message);
       this.store.addChat({ role: 'assistant', text: '', error: message });
       toast(message, 'error');
     } finally {
@@ -408,14 +478,23 @@ export class App {
     if (!action) return;
 
     switch (action.type) {
-      case 'replaceSource':
+      case 'replaceSource': {
         this.store.replaceSource(action.scad);
+        const snapshot = pushHistory({
+          source: action.scad,
+          paramValues: this.store.state.project.paramValues,
+          action: 'ai',
+          name: autoNameSource(action.scad, action.design_plan || response.narration),
+          note: response.narration,
+        });
+        if (snapshot) logger.info('history', `自动保存历史版本「${snapshot.name}」`);
         if (response.verification?.status === 'failed') {
           toast('已写入源码，但真实引擎验证未通过；可点「重抽」', 'error');
         } else {
           toast('已写入源码并重新编译');
         }
         break;
+      }
       case 'updateParams':
         for (const [name, value] of Object.entries(action.values)) this.store.setParam(name, value);
         toast('参数已更新');
@@ -457,6 +536,7 @@ export class App {
       (cfg) => {
         this.config = cfg;
         saveConfig(cfg);
+        logger.info('settings', '保存模型设置', `${cfg.provider}/${cfg.model}`);
         toast('设置已保存');
         this.onState(this.store.state);
       },
@@ -470,6 +550,14 @@ export class App {
 
   private loadExample(example: (typeof EXAMPLES)[number]): void {
     this.store.replaceSource(example.code);
+    const snapshot = pushHistory({
+      source: example.code,
+      paramValues: this.store.state.project.paramValues,
+      action: 'example',
+      name: example.name,
+      note: example.applies,
+    });
+    if (snapshot) logger.info('history', `自动保存范例「${snapshot.name}」`);
     this.store.addChat({ role: 'system', text: `已载入范例：${example.name}` });
     toast(`已载入「${example.name}」`);
   }
@@ -484,8 +572,45 @@ export class App {
   }
 
   private saveCurrent(): void {
-    saveProject(this.store.state.project);
+    const project = this.store.state.project;
+    saveProject(project);
+    const snapshot = pushHistory({
+      source: project.source,
+      paramValues: project.paramValues,
+      action: 'project',
+      name: project.name === '未命名项目' ? undefined : project.name,
+    });
+    if (snapshot) logger.info('history', `保存项目时自动快照「${snapshot.name}」`);
+    logger.info('project', '保存项目', project.name);
     toast('项目已保存到本机');
+  }
+
+  private snapshotCurrent(): void {
+    const project = this.store.state.project;
+    if (!project.source.trim()) {
+      toast('当前没有源码', 'error');
+      return;
+    }
+    const snapshot = pushHistory({
+      source: project.source,
+      paramValues: project.paramValues,
+      action: 'manual',
+      name: project.name === '未命名项目' ? undefined : project.name,
+    });
+    if (snapshot) {
+      logger.info('history', `手动保存历史版本「${snapshot.name}」`);
+      toast(`已保存历史版本「${snapshot.name}」`);
+    } else {
+      toast('当前代码已在历史中');
+    }
+  }
+
+  private openHistory(): void {
+    openHistoryModal((source, values) => {
+      this.store.restoreSnapshot(source, values);
+      this.lastOutput = null;
+      this.viewer.clearModel();
+    });
   }
 
   private newProject(): void {
@@ -496,6 +621,7 @@ export class App {
     this.lastOutput = null;
     this.viewer.clearModel();
     this.editor.setSource('');
+    logger.info('project', '新建项目');
     toast('已新建项目');
   }
 
@@ -505,7 +631,9 @@ export class App {
       toast('当前没有可导出的 STL，请先编译成功', 'error');
       return;
     }
-    downloadArrayBuffer(output, `${safeName(this.store.state.project.name)}.stl`, 'model/stl');
+    const filename = `${safeName(this.store.state.project.name)}.stl`;
+    downloadArrayBuffer(output, filename, 'model/stl');
+    logger.info('export', '导出 STL', filename);
     toast('STL 已开始下载');
   }
 
@@ -529,10 +657,14 @@ export class App {
         toast(result.messages.find((m) => m.level === 'error')?.text ?? '3MF 导出失败', 'error');
         return;
       }
-      downloadArrayBuffer(result.output, `${safeName(name)}.3mf`, 'model/3mf');
+      const filename = `${safeName(name)}.3mf`;
+      downloadArrayBuffer(result.output, filename, 'model/3mf');
+      logger.info('export', '导出 3MF', filename);
       toast('3MF 已开始下载');
     } catch (e) {
-      toast(e instanceof Error ? e.message : '3MF 导出失败', 'error');
+      const message = e instanceof Error ? e.message : '3MF 导出失败';
+      logger.error('export', '3MF 导出失败', message);
+      toast(message, 'error');
     }
   }
 
@@ -543,7 +675,9 @@ export class App {
       return;
     }
     const baked = injectParams(source, paramValues);
-    downloadBlob(new Blob([baked], { type: 'text/plain' }), `${safeName(name)}.scad`);
+    const filename = `${safeName(name)}.scad`;
+    downloadBlob(new Blob([baked], { type: 'text/plain' }), filename);
+    logger.info('export', '导出 SCAD', filename);
     toast('SCAD 已开始下载');
   }
 
@@ -555,7 +689,9 @@ export class App {
     const dataUrl = this.viewer.screenshot();
     const response = await fetch(dataUrl);
     const blob = await response.blob();
-    downloadBlob(blob, `${safeName(this.store.state.project.name)}.png`);
+    const filename = `${safeName(this.store.state.project.name)}.png`;
+    downloadBlob(blob, filename);
+    logger.info('export', '导出截图', filename);
     toast('截图已开始下载');
   }
 
@@ -564,8 +700,11 @@ export class App {
     this.viewer.setWireframe(this.wireframe);
   }
 
-  private toggleMenu(): void {
-    this.exportMenu.style.display = this.exportMenu.style.display === 'none' ? '' : 'none';
+  private centerTab(label: string, code: boolean): HTMLButtonElement {
+    const tab = button(label, 'center-tab', () => this.store.setCodeOpen(code));
+    tab.type = 'button';
+    tab.setAttribute('role', 'tab');
+    return tab;
   }
 
   private setView(view: ViewName): void {
@@ -578,6 +717,65 @@ export class App {
   }
 }
 
-function menuItem(label: string, onClick: () => void): HTMLButtonElement {
-  return button(label, '', onClick);
+type MenuItem = { label: string; action: () => void } | 'divider';
+
+function buildMenu(label: string, items: MenuItem[]): HTMLElement {
+  const menu = el('div', 'menu');
+  menu.style.display = 'none';
+  const trigger = button(label, 'menu-trigger', () => {
+    const isOpen = menu.style.display !== 'none';
+    closeMenus();
+    menu.style.display = isOpen ? 'none' : '';
+  });
+
+  for (const item of items) {
+    if (item === 'divider') {
+      menu.appendChild(el('div', 'menu-divider'));
+      continue;
+    }
+    menu.appendChild(
+      button(item.label, '', () => {
+        closeMenus();
+        item.action();
+      })
+    );
+  }
+  return el('div', 'menu-wrap', [trigger, menu]);
+}
+
+function closeMenus(): void {
+  for (const menu of document.querySelectorAll<HTMLElement>('.menu')) menu.style.display = 'none';
+}
+
+document.addEventListener('click', (event) => {
+  if (!(event.target as Element).closest('.menu-wrap')) closeMenus();
+});
+
+function trafficDot(kind: 'close' | 'min' | 'zoom', label: string, onClick: () => void): HTMLButtonElement {
+  const dot = button('', `traffic-dot ${kind}`, onClick);
+  dot.type = 'button';
+  dot.title = label;
+  dot.setAttribute('aria-label', label);
+  return dot;
+}
+
+const GEAR_ICON =
+  '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" ' +
+  'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+  '<circle cx="12" cy="12" r="3.2"/>' +
+  '<path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 ' +
+  '1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 8.9 19.4a1.7 1.7 0 0 0-1.87.34l-.06.06' +
+  'a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.09' +
+  'A1.7 1.7 0 0 0 4.6 8.9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34H9' +
+  'a1.7 1.7 0 0 0 1.03-1.56V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06' +
+  'a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87V9a1.7 1.7 0 0 0 1.56 1.03H21a2 2 0 1 1 0 4h-.09' +
+  'a1.7 1.7 0 0 0-1.51 1.03Z"/></svg>';
+
+function iconButton(_kind: 'gear', label: string, onClick: () => void): HTMLButtonElement {
+  const btn = button('', 'btn btn-icon', onClick);
+  btn.innerHTML = GEAR_ICON;
+  btn.type = 'button';
+  btn.title = label;
+  btn.setAttribute('aria-label', label);
+  return btn;
 }

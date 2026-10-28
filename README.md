@@ -24,12 +24,17 @@
 - **真实引擎验证**：每次生成都用 OpenSCAD WASM 编译；语法错误、空模型、尺寸异常会被打回重试
 - **参数面板**：按 Customizer 注释自动生成滑杆 / 枚举 / 开关 / 颜色控件，参数通过 `-D` 覆盖，不改写源码
 - **3D 预览**：Three.js Z-up 视图，等轴 / 正 / 顶 / 右视角、线框、截图
-- **范例库**：34 个完整可运行范例，支持搜索、分类、复制、一键载入
+- **范例库**：48 个完整可运行范例，覆盖容器、盒体、园艺、数学曲线、建筑、艺术与实用工具，支持搜索、分类、复制、一键载入
 - **批量变体**：一次生成多组参数，并排编译、缩略图预览、单组应用、全部导出 STL
 - **形状审核**：主模型支持图片输入时（SenseNova 6.8 / GLM-4V / GPT-4o / Claude / Gemini 等），自动把 ISO / FRONT / TOP 三视图发给它判断形状；纯文本模型退化为网格摘要 + 设计计划
 - **导出**：STL、3MF、`.scad`（含当前参数值）、项目 JSON
 - **中英双语**：顶栏一键切换，保留当前项目与编译状态
 - **本地 AI 代理**：内置 Node 中继（`127.0.0.1:17329`），解决 SenseNova / GLM / OpenAI 的浏览器 CORS 限制
+- **macOS 风格顶栏**：左侧菜单（文件 / 视图 / 帮助）、居中项目名、右侧状态；红黄绿圆点分别对应新建 / 保存 / 导出 STL
+- **中心视图切换**：3D 预览与 SCAD 源代码在同一区域切换，源码编辑器占满整个高度，可直接手改
+- **历史版本**：AI 生成、载入范例、保存项目时自动命名并快照源码，可随时载入 / 导出 / 删除
+- **运行日志**：编译、AI 调用、导出、设置等事件写入本机环形日志，可在「帮助 → 运行日志」查看 / 复制 / 导出
+- **版本与作者**：底部状态栏显示版本与开发者，帮助菜单可查看关于信息
 - **纯静态 + BYOK**：无后端，API Key 明文保存在本机浏览器 localStorage（风险自负）
 
 ## 一键安装到 Snapmaker Orca
@@ -107,7 +112,7 @@ npm run dev          # 独立网页开发
 npm run build        # 生产构建
 npm run preview      # 预览构建产物
 npm run typecheck    # tsc --noEmit
-npm test             # 单测 + 34 个范例真实引擎编译冒烟
+npm test             # 单测 + 48 个范例真实引擎编译冒烟
 ```
 
 不修改 Program Files 的插件验证方式：
@@ -126,14 +131,14 @@ npm run orca:proxy
 | 编辑器 | CodeMirror 6（自定义 OpenSCAD StreamLanguage） |
 | 预览 | Three.js + STLLoader + OrbitControls |
 | AI | 浏览器直连多 provider（OpenAI 兼容 / Anthropic 原生） |
-| 存储 | localStorage（配置、项目、对话）+ IndexedDB（中文字体） |
+| 存储 | localStorage（配置、项目、对话、历史、日志）+ IndexedDB（中文字体） |
 
 ## 目录结构
 
 ```
 ParametricModelMakerPlugin4SM_orca/
 ├── src/
-│   ├── core/                 # types / scad-parser / lint / prompts / examples
+│   ├── core/                 # types / scad-parser / lint / prompts / examples / logger
 │   ├── engine/
 │   │   ├── openscad.worker.ts  # WASM 编译 Worker（一次性实例）
 │   │   ├── compiler.ts         # 主线程编译 API（超时 / 并发）
@@ -143,9 +148,10 @@ ParametricModelMakerPlugin4SM_orca/
 │   ├── editor/               # CodeMirror + OpenSCAD 语法
 │   ├── ai/                   # provider / config / pipeline / verify
 │   ├── state/                # Store（源码、参数、编译、对话）
-│   ├── storage/              # 项目持久化与下载
-│   ├── ui/                   # 布局、对话、参数、范例、设置、批量变体
+│   ├── storage/              # 项目持久化、代码历史、字体与下载
+│   ├── ui/                   # 布局、对话、参数、范例、设置、历史、日志、关于
 │   ├── i18n.ts               # 中英文 DOM 翻译（无重载切换）
+│   ├── version.ts            # 构建时注入的版本与作者
 │   └── styles/app.css
 ├── proxy/                    # 可选 Cloudflare Worker CORS 代理
 ├── orca-plugin/              # Orca 侧边栏插件 + 安装 / 卸载 / 开发代理

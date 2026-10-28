@@ -190,6 +190,7 @@ difference() {
       '内腔 = linear_extrude(缩小的月牙轮廓)，向上偏移 bottom_thickness',
       '月牙角度由两圆偏移量控制，不是 rotate_extrude 的角度',
       '月牙是 2D 形状拉伸，【不是】rotate_extrude 旋转体',
+      'length 通过 X 向缩放实现，默认外形 120×80',
     ],
     code: `/* [主体尺寸] */
 length = 120; // [60:5:200]
@@ -230,10 +231,12 @@ module box_inner() {
         offset(r = -wall_thickness) crescent_2d(outer_r, inner_r, offset_x);
 }
 
-difference() {
-  box_outer();
-  box_inner();
-}
+// length 用 X 向缩放实现：外形长宽 = length × width（默认 120 × 80）
+scale([length / width, 1, 1])
+  difference() {
+    box_outer();
+    box_inner();
+  }
 `,
     verifiable: true,
   },
@@ -316,7 +319,7 @@ wall_thickness = 2.5; // [1:0.5:6]
 bottom_thickness = 3; // [1:0.5:8]
 
 /* [细节] */
-fillet_radius = 3; // [0:0.5:8]
+fillet_radius = 3; // [0.5:0.5:8]
 
 /* [Hidden] */
 $fn = 32;
@@ -381,7 +384,7 @@ difference() {
     applies: '带盖收纳盒、保鲜盒、电子元件盒',
     idea: '盒身顶部留凸缘，盖子底部留凹槽，两者卡扣配合',
     points: [
-      '盒身凸缘向外突出',
+      '盒身凸缘是顶部外扩的"环"，中间必须留空，否则盒子被封死',
       '盖子凹槽向内凹陷',
       '凸缘和凹槽尺寸精确配合',
     ],
@@ -405,9 +408,13 @@ module box_body() {
     translate([wall_thickness, wall_thickness, bottom_thickness])
       cube([length - 2*wall_thickness, width - 2*wall_thickness, height]);
   }
-  // 凸缘
+  // 凸缘：顶部外扩的环（中间留空，盒子仍能装东西）
   translate([-lid_gap, -lid_gap, height - 2])
-    cube([length + 2*lid_gap, width + 2*lid_gap, 2]);
+    difference() {
+      cube([length + 2*lid_gap, width + 2*lid_gap, 2]);
+      translate([lid_gap, lid_gap, -0.5])
+        cube([length, width, 3]);
+    }
 }
 
 module lid() {
@@ -866,7 +873,8 @@ $fn = 64;
 
 cup_r = cup_diameter / 2;
 handle_out = handle_ring / 2;
-handle_in = handle_out - handle_thickness;
+// 内半径下限 0.5：handle_thickness 取大值时不会出现负半径（rotate_extrude 会自交）
+handle_in = max(handle_out - handle_thickness, 0.5);
 
 difference() {
   cylinder(h = cup_height, r = cup_r);
@@ -909,7 +917,9 @@ fillet_radius = 6; // [2:0.5:15]
 $fn = 48;
 
 module rounded_square(l, w, r) {
-  offset(r = r) square([l - 2*r, w - 2*r], center = true);
+  // r 上限 = 短边一半减 1：极端参数下内缩矩形不会退化成零
+  rr = max(0.5, min(r, min(l, w) / 2 - 1));
+  offset(r = rr) square([l - 2*rr, w - 2*rr], center = true);
 }
 
 difference() {
@@ -954,7 +964,9 @@ fillet_radius = 5; // [2:0.5:12]
 $fn = 48;
 
 module rounded_square(l, w, r) {
-  offset(r = r) square([l - 2*r, w - 2*r], center = true);
+  // r 上限 = 短边一半减 1：极端参数下内缩矩形不会退化成零
+  rr = max(0.5, min(r, min(l, w) / 2 - 1));
+  offset(r = rr) square([l - 2*rr, w - 2*rr], center = true);
 }
 
 difference() {
@@ -1011,7 +1023,7 @@ $fn = 64;
 
 pot_top_r = pot_top_diameter / 2;
 pot_bot_r = pot_bottom_diameter / 2;
-hole_r = hole_diameter / 2;
+hole_r = min(hole_diameter / 2, pot_bot_r * 0.28);
 hole_ring = pot_bot_r * 0.55;
 
 difference() {
@@ -1180,7 +1192,7 @@ for (i = [0 : bar_count - 1]) {
     points: [
       '演算：spiral_r(θ) = r0 * pow(phi, θ/90)，θ 步长 5° 平滑',
       '带状闭合 = 外缘（θ 从 0→总角）+ 内缘（θ 从 总角→0，半径减带宽）',
-      '起点 r0 > 带宽，中心不退化',
+      '内缘半径下限 0.4：中心段带宽自动收窄，r0 < 带宽时也不会出现负半径翻点',
     ],
     code: `/* [螺旋盘] */
 outer_diameter = 100; // [50:5:200]
@@ -1195,12 +1207,14 @@ phi = (1 + sqrt(5)) / 2;
 r0 = outer_diameter / 2 / pow(phi, turns * 360 / 90);
 
 function spiral_r(t) = r0 * pow(phi, t / 90);
+// 内缘半径下限 0.4：r0 < band_width 时避免负半径把点翻到对侧
+function band_inner_r(t) = max(spiral_r(t) - band_width, 0.4);
 total = turns * 360;
 
 outer_edge = [ for (t = [0 : 5 : total])
   [spiral_r(t) * cos(t), spiral_r(t) * sin(t)] ];
 inner_edge = [ for (t = [total : -5 : 0])
-  [(spiral_r(t) - band_width) * cos(t), (spiral_r(t) - band_width) * sin(t)] ];
+  [band_inner_r(t) * cos(t), band_inner_r(t) * sin(t)] ];
 
 linear_extrude(height = thickness)
   polygon(concat(outer_edge, inner_edge));
@@ -1521,8 +1535,8 @@ translate([0, 0, base_height + column_height + 3 + roof_height + finial_height *
     idea: 'for 层堆叠：每层 = 方形层身 + 出檐（比层身大的薄方板）。层身逐层收缩，层高逐层降低，顶层收尖',
     points: [
       '演算：第 i 层身宽 w = base_w * (1 - i * taper)，taper 取 4%~6%',
-      '层底 z = i * (level_h + eave_t)，出檐板比层身四周大出 eave_over',
-      '每层身四面开圆窗（环排 difference），首层正面开方门',
+      '层高逐层降 5%，所以下一层起点必须按累计高度算，否则层与层之间会悬空',
+      '每层身四面开圆窗（环排 difference），层底落在下一层檐板上',
     ],
     code: `/* [塔身] */
 base_width = 60; // [30:5:120]
@@ -1555,17 +1569,23 @@ module eave(w, t) {
   translate([-w / 2, -w / 2, 0]) cube([w, w, t]);
 }
 
+// 每层收缩 5%，层身逐层变矮：层起点必须累计，不能简单用 i*(level_height + eave)
+shrink = 0.05;
+function level_h(i) = level_height * (1 - i * shrink);
+function level_z(i) = i * eave_thickness + level_height * (i - shrink * i * (i - 1) / 2);
+last_level = levels - 1;
+top_z = level_z(last_level) + level_h(last_level) + eave_thickness;
+top_w = base_width * (1 - last_level * taper);
+
 union() {
-  for (i = [0 : levels - 1]) {
+  for (i = [0 : last_level]) {
     w = base_width * (1 - i * taper);
-    h = level_height * (1 - i * 0.05);
-    z = i * (level_height + eave_thickness);
+    h = level_h(i);
+    z = level_z(i);
     translate([0, 0, z]) level_body(w, h);
     translate([0, 0, z + h]) eave(w + eave_over * 2, eave_thickness);
   }
-  // 顶层收尖
-  top_z = levels * (level_height + eave_thickness);
-  top_w = base_width * (1 - (levels - 1) * taper);
+  // 顶层收尖（坐在最后一层檐板上）
   translate([0, 0, top_z])
     cylinder(h = level_height * 0.9, d1 = top_w, d2 = 4, $fn = 4);
 }
@@ -1652,11 +1672,11 @@ union() {
     category: '艺术风格',
     level: 'advanced',
     applies: '动态雕塑、构成主义、考尔德风、平衡装置摆件',
-    idea: '底座竖杆 + 顶端斜出横杆，两端各挂不同大小的圆盘/弧片，重心故意不对称——"不稳定中的平衡"就是风格本体。一体打印，接触处实体重叠',
+    idea: '底座竖杆 + 顶端横杆，两端一上一下挂不同大小的圆盘，重心故意不对称——"不稳定中的平衡"就是风格本体。全部 union 成一体，吊杆与盘面重叠 2mm',
     points: [
-      '主杆竖直，横杆 rotate 一定角度斜出，两端盘径一大一小（重量错觉）',
-      '挂盘 = 薄 cylinder，各盘 rotate 不同角度制造"风中转动"瞬间感',
-      '接触处重叠 ≥ 1mm 保证一体打印不断裂',
+      '主杆沉入底座 2mm、横杆穿过主杆，所有零件都在同一个 union 里',
+      '横杆沿 X 轴，整体绕竖杆偏转 arm_yaw；两端盘径一大一小（重量错觉）',
+      '挂盘 = 薄 cylinder，吊杆底端埋进盘面 2mm，保证一体打印不断裂',
     ],
     code: `/* [底座] */
 base_diameter = 60; // [30:5:120]
@@ -1670,47 +1690,45 @@ rod_diameter = 5; // [2:0.5:10]
 arm_length = 80; // [40:5:160]
 big_disc = 34; // [15:2:70]
 small_disc = 20; // [10:2:50]
-arm_tilt = 12; // [0:1:35]
+arm_yaw = 12; // [0:1:35]
 
 /* [Hidden] */
 $fn = 48;
 
 top_z = base_height + mast_height;
-
-// 底座
-cylinder(h = base_height, d1 = base_diameter, d2 = base_diameter * 0.85);
-
-// 主杆
-translate([0, 0, base_height])
-  cylinder(h = mast_height, d = rod_diameter);
+arm_z = top_z - 4;
+arm_in_x = -arm_length * 0.35;
+arm_out_x = arm_length * 0.65;
+disc_rod = rod_diameter * 0.6;
 
 union() {
-  // 横杆（水平圆柱，绕 x 轴倾斜 arm_tilt）
-  translate([0, 0, top_z])
-    rotate([arm_tilt, 0, 0])
+  // 底座
+  cylinder(h = base_height, d1 = base_diameter, d2 = base_diameter * 0.85);
+  // 主杆（沉入底座 2mm）
+  translate([0, 0, base_height - 2])
+    cylinder(h = mast_height + 2, d = rod_diameter);
+
+  // 横杆与挂盘：整体绕竖杆偏转 arm_yaw
+  rotate([0, 0, arm_yaw]) {
+    // 横杆（沿 X 轴，穿过主杆）
+    translate([arm_in_x, 0, arm_z])
       rotate([0, 90, 0])
-        translate([0, 0, -arm_length * 0.35])
-          cylinder(h = arm_length, d = rod_diameter * 0.8);
+        cylinder(h = arm_length, d = rod_diameter * 0.8);
 
-  // 大盘（横杆后端，下垂挂）
-  translate([-arm_length * 0.35 * cos(arm_tilt),
-             arm_length * 0.35 * sin(arm_tilt) * 0.0,
-             top_z - big_disc / 2 - 6])
-    rotate([18, 0, 0])
-      cylinder(h = 3, d = big_disc);
-  // 大盘吊杆
-  translate([-arm_length * 0.35, 0, top_z - 3])
-    cylinder(h = 10, d = rod_diameter * 0.6);
+    // 大盘：吊杆从横杆垂下，底端埋进盘面 2mm
+    translate([arm_in_x, 0, arm_z - 12])
+      cylinder(h = 12, d = disc_rod);
+    translate([arm_in_x, 0, arm_z - 13])
+      rotate([18, 0, 0])
+        cylinder(h = 3, d = big_disc);
 
-  // 小盘（横杆前端，上翘挂）
-  translate([arm_length * 0.65 * cos(arm_tilt),
-             0,
-             top_z + arm_length * 0.65 * sin(arm_tilt) - small_disc / 2 - 4])
-    rotate([-25, 0, 0])
-      cylinder(h = 3, d = small_disc);
-  // 小盘吊杆
-  translate([arm_length * 0.65 * cos(arm_tilt), 0, top_z + arm_length * 0.65 * sin(arm_tilt) - 4])
-    cylinder(h = 8, d = rod_diameter * 0.6);
+    // 小盘：吊杆从横杆向上，顶端埋进盘面 2mm
+    translate([arm_out_x, 0, arm_z])
+      cylinder(h = 10, d = disc_rod);
+    translate([arm_out_x, 0, arm_z + 8])
+      rotate([-25, 0, 0])
+        cylinder(h = 3, d = small_disc);
+  }
 }
 `,
     verifiable: true,
@@ -1765,6 +1783,700 @@ module relief() {
 }
 
 relief();
+`,
+    verifiable: true,
+  },
+  {
+    id: 35,
+    name: '手机横放支架',
+    category: '实用工具',
+    level: 'classic',
+    applies: '横屏看视频、视频通话、平板托架',
+    idea: '低矮底座 + 后仰背板 + 前唇三件套：手机横放，下沿卡在前唇与背板之间，靠重力自稳',
+    points: [
+      '前唇与背板都下沉 1mm 与底座相交，不是只贴面',
+      '背板用 rotate([-tilt_angle,0,0]) 让顶端向 +Y 后仰，整块重心仍在底座范围内',
+      '演算：背板底边 y = base_depth*0.5，顶端后移 back_height*sin(tilt) 不超出底座',
+    ],
+    code: `/* [底座] */
+stand_width = 150; // [100:5:220]
+base_depth = 80; // [60:5:140]
+base_thickness = 6; // [4:1:12]
+
+/* [背板] */
+back_height = 100; // [60:5:160]
+tilt_angle = 20; // [5:1:40]
+board_thickness = 4; // [2:0.5:8]
+
+/* [前唇] */
+lip_height = 12; // [6:1:30]
+lip_thickness = 5; // [3:0.5:10]
+
+/* [Hidden] */
+$fn = 48;
+
+back_y = base_depth * 0.5;
+
+// 底座
+cube([stand_width, base_depth, base_thickness]);
+
+// 背板：底部沉入底座 1mm，顶端后仰
+translate([0, back_y, base_thickness - 1])
+  rotate([-tilt_angle, 0, 0])
+    cube([stand_width, board_thickness, back_height]);
+
+// 前唇：挡手机下沿
+translate([0, 0, base_thickness - 1])
+  cube([stand_width, lip_thickness, lip_height + 1]);
+`,
+    verifiable: true,
+  },
+  {
+    id: 36,
+    name: '线缆夹',
+    category: '实用工具',
+    level: 'basic',
+    applies: '桌面理线、耳机线/充电线固定、线束收纳',
+    idea: 'C 形弹性夹：外圆减内孔，再从侧面开一道比线径窄的口，线压进去后被夹住',
+    points: [
+      '开口从圆心沿 +Y 一直切到外圆（cube 伸出 outer_r+1）',
+      '开口宽 gap_width 必须小于线径，否则失去夹持力',
+      '壁厚 =（外半径 - 线半径），2~3mm 兼顾弹性与强度',
+    ],
+    code: `/* [线缆] */
+cable_diameter = 6; // [3:0.5:14]
+
+/* [夹体] */
+clip_width = 10; // [4:1:25]
+wall_thickness = 2.5; // [1.5:0.5:5]
+gap_width = 3.5; // [1.5:0.5:8]
+
+/* [Hidden] */
+$fn = 64;
+
+outer_r = cable_diameter / 2 + wall_thickness;
+
+difference() {
+  cylinder(h = clip_width, r = outer_r);
+  // 内孔
+  translate([0, 0, -0.5])
+    cylinder(h = clip_width + 1, r = cable_diameter / 2);
+  // 侧向开口：比线径窄，靠材料弹性卡入
+  translate([-gap_width / 2, 0, -0.5])
+    cube([gap_width, outer_r + 1, clip_width + 1]);
+}
+`,
+    verifiable: true,
+  },
+  {
+    id: 37,
+    name: '墙壁挂钩',
+    category: '实用工具',
+    level: 'classic',
+    applies: '钥匙/背包/耳机挂钩、墙面收纳钩、衣帽钩',
+    idea: '竖直背板开两个螺丝孔，正面伸出一段横臂，臂端用 rotate_extrude 的四分之一圆环向上回卷成钩',
+    points: [
+      '横臂从 plate_thickness-1 处起，埋进背板 1mm，union 后是一体',
+      '弯钩 = rotate_extrude(angle=90) 的圆环，再 rotate([0,-90,0]) 把圆弧立到 Y-Z 平面',
+      '臂端与弯钩交接处补一个 sphere，避免只共面不重叠',
+    ],
+    code: `/* [背板] */
+plate_width = 30; // [20:2:60]
+plate_height = 55; // [30:5:100]
+plate_thickness = 4; // [2:0.5:8]
+
+/* [挂钩] */
+arm_length = 35; // [20:5:70]
+hook_radius = 12; // [6:1:25]
+rod_radius = 3.5; // [2:0.5:6]
+
+/* [螺丝孔] */
+screw_hole = 4.5; // [3:0.5:8]
+
+/* [Hidden] */
+$fn = 48;
+
+arm_z = plate_height * 0.55;
+arm_end = plate_thickness - 1 + arm_length;
+
+difference() {
+  union() {
+    // 背板（X 居中）
+    translate([-plate_width / 2, 0, 0])
+      cube([plate_width, plate_thickness, plate_height]);
+    // 水平臂
+    translate([0, plate_thickness - 1, arm_z])
+      rotate([-90, 0, 0])
+        cylinder(h = arm_length, r = rod_radius);
+    // 弯钩：圆弧从臂端向上回卷
+    translate([0, arm_end - hook_radius, arm_z])
+      rotate([0, -90, 0])
+        rotate_extrude(angle = 90)
+          translate([hook_radius, 0])
+            circle(r = rod_radius);
+    // 关节球：臂与弯钩实体重叠
+    translate([0, arm_end, arm_z]) sphere(r = rod_radius);
+  }
+  // 螺丝孔（贯穿背板）
+  for (p = [[-plate_width * 0.28, plate_height * 0.82],
+            [ plate_width * 0.28, plate_height * 0.82],
+            [ 0,                  plate_height * 0.18]])
+    translate([p[0], plate_thickness / 2, p[1]])
+      rotate([-90, 0, 0])
+        cylinder(h = plate_thickness + 2, r = screw_hole / 2, center = true);
+}
+`,
+    verifiable: true,
+  },
+  {
+    id: 38,
+    name: '内六角扳手架',
+    category: '实用工具',
+    level: 'basic',
+    applies: '内六角扳手收纳、螺丝刀/钻头立放、小工具排插',
+    idea: '条状底座上按序号等距开一排六边形盲孔，孔径逐级递增，一套扳手从大到小各就各位',
+    points: [
+      '六角孔 = cylinder($fn=6)，孔径沿序号等差递增',
+      '孔径上限同时受条宽与孔间距约束（max_hole），极端参数不会打穿侧壁或并孔',
+      '孔是盲孔：从顶面向下挖 pocket_depth，底面留料',
+    ],
+    code: `/* [底座] */
+base_length = 90; // [50:5:160]
+base_width = 24; // [14:1:40]
+base_height = 12; // [8:1:28]
+
+/* [六角孔] */
+wrench_count = 6; // [3:1:9]
+min_size = 2.5; // [1.5:0.5:5]
+size_step = 1.2; // [0.2:0.2:2.5]
+hole_clearance = 0.4; // [0.1:0.1:1]
+hole_depth_ratio = 0.6; // [0.3:0.05:0.9]
+
+/* [Hidden] */
+$fn = 64;
+
+spacing = base_length / (wrench_count + 1);
+pocket_depth = base_height * hole_depth_ratio;
+max_hole = min(base_width - 4, spacing * 0.8);
+
+difference() {
+  translate([-base_length / 2, -base_width / 2, 0])
+    cube([base_length, base_width, base_height]);
+  for (i = [0 : wrench_count - 1]) {
+    d = min(min_size + i * size_step, max_hole) + hole_clearance;
+    translate([-base_length / 2 + spacing * (i + 1), 0, base_height - pocket_depth])
+      cylinder(h = pocket_depth + 1, d = d, $fn = 6);
+  }
+}
+`,
+    verifiable: true,
+  },
+  {
+    id: 39,
+    name: 'SD 卡收纳盒',
+    category: '实用工具',
+    level: 'classic',
+    applies: 'SD/microSD 卡收纳、名片盒、薄片样品收纳',
+    idea: '方形盒体正面（-Y）开放，内部按卡厚 + 间隙切成多层水平槽，卡片从前面滑入，后壁和顶盖挡灰',
+    points: [
+      '槽高 = 卡厚 + clearance，槽与槽之间留 separator 隔板',
+      '槽从 -1 起挖到 box_w - back_thickness，后壁厚度正好保留',
+      '顶面留 wall_thickness 压边，卡片不会从上方掉出',
+    ],
+    code: `/* [盒体] */
+card_length = 32; // [22:1:45]
+card_width = 24; // [17:1:35]
+slots = 3; // [1:1:6]
+wall_thickness = 2.5; // [1.5:0.5:5]
+bottom_thickness = 3; // [2:0.5:6]
+back_thickness = 2; // [1.5:0.5:5]
+
+/* [卡槽] */
+card_thickness = 2.1; // [1:0.1:4]
+clearance = 1; // [0.4:0.2:2]
+separator = 1.5; // [0.8:0.2:3]
+
+/* [Hidden] */
+$fn = 48;
+
+gap = card_thickness + clearance;
+box_l = card_length + 2 * wall_thickness;
+box_w = card_width + wall_thickness + back_thickness;
+box_h = bottom_thickness + slots * gap + (slots - 1) * separator + wall_thickness;
+
+difference() {
+  cube([box_l, box_w, box_h]);
+  for (i = [0 : slots - 1]) {
+    z = bottom_thickness + i * (gap + separator);
+    // 前面开放，卡片沿 +Y 滑入
+    translate([wall_thickness - 0.5, -1, z])
+      cube([card_length + 1, box_w - back_thickness + 1, gap]);
+  }
+}
+`,
+    verifiable: true,
+  },
+  {
+    id: 40,
+    name: '杯垫套装',
+    category: '家居生活',
+    level: 'basic',
+    applies: '杯垫、锅垫、鼠标垫片，一套多件一起打印',
+    idea: '六边形轮廓（cylinder + $fn=6）顶面挖一层浅凹槽挡水，count 个按两列自动排布成一套',
+    points: [
+      '所有圆统一用 $fn=6，杯垫和凹槽都是同向六边形，边距均匀',
+      '凹槽深 recess_depth、外沿留 rim_width，洒出的水不会流到桌面',
+      '2 列排布，count 1~6 时不会超出热床（默认 4 件约 190mm 宽）',
+    ],
+    code: `/* [杯垫] */
+coaster_size = 90; // [60:5:120]
+coaster_thickness = 6; // [4:0.5:12]
+rim_width = 6; // [3:1:12]
+recess_depth = 1.5; // [0.5:0.2:3]
+
+/* [套装布局] */
+count = 4; // [1:1:6]
+gap = 6; // [2:1:20]
+
+/* [Hidden] */
+$fn = 6;
+
+module coaster() {
+  difference() {
+    cylinder(h = coaster_thickness, d = coaster_size);
+    translate([0, 0, coaster_thickness - recess_depth])
+      cylinder(h = recess_depth + 1, d = coaster_size - 2 * rim_width);
+  }
+}
+
+for (i = [0 : count - 1]) {
+  col = i % 2;
+  row = floor(i / 2);
+  translate([col * (coaster_size + gap), row * (coaster_size + gap), 0])
+    coaster();
+}
+`,
+    verifiable: true,
+  },
+  {
+    id: 41,
+    name: '书立',
+    category: '家居生活',
+    level: 'classic',
+    applies: '书立、挡书板、唱片/文件分隔立板',
+    idea: 'L 形主体：横向底板压在书下，端头一块竖背板，背面再加两片三角形加强筋，单体打印无需支撑',
+    points: [
+      '背板与底板在 x∈[-plate_thickness,0] 内重叠，不是贴面拼接',
+      '加强筋在 X-Z 平面画三角形，再 rotate([90,0,0]) 沿 Y 拉伸',
+      '加强筋从背板背面一直压到底板，受力方向正好是书本推力',
+    ],
+    code: `/* [底板] */
+base_length = 75; // [50:5:140]
+base_width = 90; // [50:5:160]
+base_thickness = 5; // [3:1:12]
+
+/* [背板] */
+plate_height = 120; // [60:5:200]
+plate_thickness = 5; // [3:1:10]
+
+/* [加强筋] */
+rib_length = 45; // [20:5:80]
+rib_height = 70; // [30:5:150]
+rib_thickness = 4; // [2:1:8]
+
+/* [Hidden] */
+$fn = 32;
+
+// 底板（x 从 -plate_thickness 起，与背板重叠）
+translate([-plate_thickness, 0, 0])
+  cube([base_length + plate_thickness, base_width, base_thickness]);
+
+// 背板
+translate([-plate_thickness, 0, 0])
+  cube([plate_thickness, base_width, plate_height]);
+
+// 三角形加强筋：X-Z 平面画三角形，沿 Y 拉伸
+for (y = [base_width * 0.15, base_width * 0.85])
+  translate([0, y, 0])
+    rotate([90, 0, 0])
+      linear_extrude(height = rib_thickness, center = true)
+        polygon([[-plate_thickness, 0], [rib_length, 0], [-plate_thickness, rib_height]]);
+`,
+    verifiable: true,
+  },
+  {
+    id: 42,
+    name: '抽屉分隔条',
+    category: '家居生活',
+    level: 'basic',
+    applies: '抽屉分区、收纳盒隔断、零件盒分格',
+    idea: '条状隔板平放打印，沿上边按等距开槽；打印两条同款交叉对插即成网格',
+    points: [
+      '平放打印：X-Y 大面贴床，只有 strip_thickness 在 Z，无需支撑',
+      '槽宽 = 条厚 + slot_gap，两条同款才能对插',
+      '槽深取高度的一半（ratio 0.5），对插后上下沿齐平',
+    ],
+    code: `/* [分隔条] */
+strip_length = 180; // [80:10:280]
+strip_height = 25; // [15:1:60]
+strip_thickness = 3; // [1.5:0.5:6]
+
+/* [插槽] */
+slot_count = 7; // [2:1:15]
+slot_gap = 0.4; // [0.2:0.1:1]
+slot_depth_ratio = 0.5; // [0.35:0.05:0.5]
+
+/* [Hidden] */
+$fn = 32;
+
+slot_width = strip_thickness + slot_gap;
+slot_depth = strip_height * slot_depth_ratio;
+
+difference() {
+  cube([strip_length, strip_height, strip_thickness]);
+  for (i = [0 : slot_count - 1]) {
+    x = strip_length * (i + 0.5) / slot_count;
+    translate([x - slot_width / 2, strip_height - slot_depth, -1])
+      cube([slot_width, slot_depth + 1, strip_thickness + 2]);
+  }
+}
+`,
+    verifiable: true,
+  },
+  {
+    id: 43,
+    name: '纸巾盒',
+    category: '家居生活',
+    level: 'classic',
+    applies: '抽纸盒、纸巾收纳、桌面收纳盒',
+    idea: '圆角方盒整体拉伸，底部敞开方便塞入整包纸巾，顶部留一层实心板再开椭圆抽纸口',
+    points: [
+      '内腔从 z=-1 起挖，底部完全开通，纸巾包从下面塞进去',
+      '顶部保留 top_thickness 实心板，再挖椭圆口',
+      '抽纸口尺寸用 min() 夹在内腔范围内，极端参数不会切穿盒壁',
+    ],
+    code: `/* [盒体] */
+box_length = 240; // [120:10:300]
+box_width = 120; // [80:5:200]
+box_height = 75; // [40:5:150]
+wall_thickness = 3; // [1.5:0.5:6]
+top_thickness = 4; // [2:0.5:10]
+
+/* [圆角] */
+corner_radius = 12; // [2:1:30]
+
+/* [抽纸口] */
+opening_length = 100; // [50:5:220]
+opening_width = 40; // [20:5:100]
+
+/* [Hidden] */
+$fn = 48;
+
+module rounded_square(l, w, r) {
+  // r 上限 = 短边一半减 1：极端参数下内缩矩形不会退化成零
+  rr = max(0.5, min(r, min(l, w) / 2 - 1));
+  offset(r = rr) square([l - 2*rr, w - 2*rr], center = true);
+}
+
+// 抽纸口必须落在内腔以内
+open_l = min(opening_length, box_length - 2 * wall_thickness - 10);
+open_w = min(opening_width, box_width - 2 * wall_thickness - 10);
+
+difference() {
+  linear_extrude(height = box_height)
+    rounded_square(box_length, box_width, corner_radius);
+  // 内腔：底部开口，整包纸巾从下面塞入
+  translate([0, 0, -1])
+    linear_extrude(height = box_height - top_thickness + 1)
+      offset(r = -wall_thickness)
+        rounded_square(box_length, box_width, corner_radius);
+  // 顶部椭圆抽纸口
+  translate([0, 0, box_height - top_thickness - 1])
+    scale([open_l / open_w, 1, 1])
+      cylinder(h = top_thickness + 2, d = open_w);
+}
+`,
+    verifiable: true,
+  },
+  {
+    id: 44,
+    name: '自吸水花盆',
+    category: '园艺家居',
+    level: 'advanced',
+    applies: '自吸水种植盆、懒人花盆、多肉/香草双盆结构',
+    idea: '外盆储水、内盆悬空：内盆法兰坐在外盆口沿上，盆底与水面留出储水空间，棉绳孔吸水、环排孔排水',
+    points: [
+      '内盆外径与高度都用 min() 夹在储水槽内，极端参数组合也不会穿模',
+      '法兰坐在外盆口沿（z = reservoir_height），内盆底部悬空留出储水层',
+      '中心棉绳孔 + 环排排水孔都从盆底钻通，吸水靠棉绳毛细',
+    ],
+    code: `/* [外盆] */
+reservoir_diameter = 110; // [70:5:200]
+reservoir_height = 75; // [40:5:160]
+wall_thickness = 3; // [2:0.5:6]
+bottom_thickness = 3; // [2:0.5:6]
+
+/* [内盆] */
+pot_diameter = 96; // [50:5:180]
+pot_height = 60; // [30:5:120]
+pot_taper = 0.75; // [0.5:0.05:0.95]
+flange_thickness = 3; // [2:0.5:6]
+
+/* [排水] */
+wick_hole = 8; // [4:1:20]
+drain_count = 3; // [0:1:8]
+drain_hole = 5; // [3:1:12]
+
+/* [Hidden] */
+$fn = 64;
+
+// 内盆口径与高度都限制在储水槽内部
+pot_top_r = min(pot_diameter / 2, reservoir_diameter / 2 - wall_thickness - 1);
+pot_bottom_r = pot_top_r * pot_taper;
+pot_h = min(pot_height, reservoir_height - bottom_thickness - 6);
+// 法兰底面落在外盆口沿上，由此反推内盆原点
+pot_z = reservoir_height - (pot_h - flange_thickness);
+
+// 外盆：储水槽
+difference() {
+  cylinder(h = reservoir_height, d = reservoir_diameter);
+  translate([0, 0, bottom_thickness])
+    cylinder(h = reservoir_height, d = reservoir_diameter - 2 * wall_thickness);
+}
+
+// 内盆：外沿法兰 + 排水孔 + 中心棉绳孔
+translate([0, 0, pot_z])
+  difference() {
+    union() {
+      cylinder(h = pot_h, r1 = pot_bottom_r, r2 = pot_top_r);
+      translate([0, 0, pot_h - flange_thickness])
+        cylinder(h = flange_thickness, d = reservoir_diameter + 4);
+    }
+    translate([0, 0, bottom_thickness])
+      cylinder(h = pot_h, r1 = pot_bottom_r - wall_thickness, r2 = pot_top_r - wall_thickness);
+    translate([0, 0, -1])
+      cylinder(h = bottom_thickness + 1, d = wick_hole);
+    for (i = [0 : drain_count - 1]) {
+      angle = i * 360 / max(drain_count, 1);
+      translate([pot_bottom_r * 0.6 * cos(angle), pot_bottom_r * 0.6 * sin(angle), -1])
+        cylinder(h = bottom_thickness + 1, d = drain_hole);
+    }
+  }
+`,
+    verifiable: true,
+  },
+  {
+    id: 45,
+    name: '多肉标签牌',
+    category: '园艺家居',
+    level: 'basic',
+    applies: '多肉/香草标签、花园插牌、样品标识牌',
+    idea: '整块 2D 轮廓（牌面 + 柄 + 尖头）一次拉伸，平放打印；牌面再挖一层浅凹槽方便书写',
+    points: [
+      '牌面、柄、尖头三段在 2D 里重叠 0.01，union 后没有接缝',
+      '尖头用 polygon 三角形，斜插进土里不易折断',
+      '凹槽用 offset 圆角方框，margin 用 min() 夹紧保证不超边',
+    ],
+    code: `/* [标签牌] */
+tag_height = 100; // [60:5:160]
+plate_width = 34; // [20:2:70]
+plate_height = 30; // [15:2:60]
+stake_width = 8; // [5:1:20]
+tip_length = 14; // [6:1:30]
+tag_thickness = 2; // [1.2:0.2:4]
+
+/* [书写面] */
+recess_depth = 0.6; // [0.2:0.1:1.5]
+recess_margin = 5; // [2:1:12]
+
+/* [Hidden] */
+$fn = 32;
+
+plate_bottom = tag_height - plate_height;
+// 凹槽内缩量上限：保证凹槽始终落在牌面内
+margin = min(recess_margin, min(plate_width, plate_height) / 2 - 3);
+
+module tag_2d() {
+  translate([-plate_width / 2, plate_bottom])
+    square([plate_width, plate_height]);
+  translate([-stake_width / 2, tip_length])
+    square([stake_width, plate_bottom - tip_length + 0.01]);
+  translate([-stake_width / 2, 0])
+    polygon([[0, tip_length], [stake_width, tip_length], [stake_width / 2, 0]]);
+}
+
+difference() {
+  linear_extrude(height = tag_thickness) tag_2d();
+  // 顶部浅凹槽：马克笔书写不打滑
+  translate([0, tag_height - plate_height / 2, tag_thickness - recess_depth])
+    linear_extrude(height = recess_depth + 1)
+      offset(r = 2)
+        square([plate_width - 2 * margin, plate_height - 2 * margin], center = true);
+}
+`,
+    verifiable: true,
+  },
+  {
+    id: 46,
+    name: '笔筒带手机槽',
+    category: '桌面收纳',
+    level: 'classic',
+    applies: '桌面笔筒 + 手机立槽、化妆刷筒、工具筒',
+    idea: '圆筒笔筒外挂两片竖直夹板：夹板间距 = 手机厚 + 间隙，底部用一块垫板把它们和筒壁连成一体',
+    points: [
+      '槽宽 gap = phone_thickness + slot_clearance，手机插进去不晃',
+      '内夹板伸进筒壁 2mm、垫板横跨两片夹板，union 后是一体',
+      '手机下沿落在垫板顶面 pad_height，不会漏到桌面',
+    ],
+    code: `/* [笔筒] */
+cup_diameter = 85; // [50:5:140]
+cup_height = 100; // [50:5:180]
+wall_thickness = 2.5; // [1.5:0.5:6]
+bottom_thickness = 3; // [2:0.5:8]
+
+/* [手机槽] */
+phone_thickness = 8; // [5:0.5:15]
+slot_clearance = 0.6; // [0.2:0.2:2]
+slot_length = 60; // [40:2:100]
+slot_height = 45; // [25:5:90]
+fin_thickness = 4; // [2:0.5:8]
+pad_height = 4; // [2:0.5:10]
+
+/* [Hidden] */
+$fn = 64;
+
+cup_r = cup_diameter / 2;
+inner_r = cup_r - wall_thickness;
+gap = phone_thickness + slot_clearance;
+fin1_x = inner_r - 2;
+fin2_x = fin1_x + fin_thickness + gap;
+pad_end = fin2_x + fin_thickness;
+
+union() {
+  // 笔筒
+  difference() {
+    cylinder(h = cup_height, r = cup_r);
+    translate([0, 0, bottom_thickness])
+      cylinder(h = cup_height, r = inner_r);
+  }
+  // 垫板：把两片夹板与筒壁连起来
+  translate([fin1_x, -slot_length / 2, 0])
+    cube([pad_end - fin1_x, slot_length, pad_height]);
+  // 内夹板 / 外夹板
+  translate([fin1_x, -slot_length / 2, 0])
+    cube([fin_thickness, slot_length, slot_height]);
+  translate([fin2_x, -slot_length / 2, 0])
+    cube([fin_thickness, slot_length, slot_height]);
+}
+`,
+    verifiable: true,
+  },
+  {
+    id: 47,
+    name: 'XYZ 校准块',
+    category: '桌面收纳',
+    level: 'basic',
+    applies: '打印机 XYZ 尺寸自检、孔径收缩对比、耗材公差快速验证',
+    idea: '20mm 立方体作为通用 XYZ 基准，中心通孔、侧面横槽、顶部公差柱各测一项尺寸特征',
+    points: [
+      '20mm 立方体是通用 XYZ 基准，量外廓即可知道三轴是否准确',
+      '通孔测孔径收缩，横槽贯通侧壁测层间结合，顶部柱测外径',
+      '柱径与槽深都用 min() 夹紧，参数拉到极限也不会粘连或切穿',
+    ],
+    code: `/* [基准块] */
+cube_size = 20; // [10:1:50]
+
+/* [孔与槽] */
+hole_diameter = 8; // [4:1:16]
+slot_width = 2; // [1:0.5:6]
+slot_depth = 8; // [3:1:20]
+
+/* [公差柱] */
+pin_count = 3; // [0:1:6]
+pin_diameter = 4; // [2:0.5:8]
+pin_height = 10; // [5:1:25]
+
+/* [Hidden] */
+$fn = 64;
+
+difference() {
+  cube([cube_size, cube_size, cube_size]);
+  // 中心通孔
+  translate([cube_size / 2, cube_size / 2, -0.5])
+    cylinder(h = cube_size + 1, d = min(hole_diameter, cube_size - 4));
+  // 侧向横槽：检验层间结合与缝隙
+  translate([-1, cube_size / 2 - cube_size * 0.15, cube_size / 2 - slot_width / 2])
+    cube([min(slot_depth, cube_size - 2) + 1, cube_size * 0.3, slot_width]);
+}
+
+// 顶部公差柱：柱径按间距夹紧，避免相邻柱粘连
+for (i = [0 : pin_count - 1]) {
+  spacing = cube_size / (pin_count + 1);
+  d = min(pin_diameter, spacing * 0.7);
+  translate([spacing * (i + 1), cube_size / 2, cube_size - 1])
+    cylinder(h = pin_height + 1, d = d);
+}
+`,
+    verifiable: true,
+  },
+  {
+    id: 48,
+    name: '螺旋花瓶',
+    category: '装饰造型',
+    level: 'advanced',
+    applies: '螺旋纹花瓶、扭曲纹装饰瓶、笔筒/收纳筒（改壁厚）',
+    idea: '把带波浪起伏的环形轮廓用 linear_extrude 的 twist + scale 一次挤出：一边旋转一边收口，成型即是螺旋扭曲的瓶身',
+    points: [
+      'twist 单位是度，slices 要跟着加大（默认 72），否则扭曲面会拉成折面',
+      '内腔 = 同一轮廓内缩 wall_thickness 再做 2D 差集，壁厚沿高度按 scale 等比变薄',
+      '瓶底用同轮廓薄片 union 封口，瓶口保持开放',
+    ],
+    code: `/* [瓶体] */
+vase_height = 140; // [60:5:250]
+vase_diameter = 80; // [40:5:160]
+wall_thickness = 2.5; // [1.5:0.5:5]
+bottom_thickness = 3; // [2:0.5:8]
+
+/* [螺旋] */
+twist_angle = 120; // [0:15:360]
+ripple_count = 6; // [0:1:12]
+ripple_depth = 0.12; // [0:0.02:0.3]
+top_scale = 0.8; // [0.65:0.05:1.2]
+
+/* [细节] */
+segments = 64; // [48:8:128]
+slices = 72; // [40:8:160]
+
+/* [Hidden] */
+base_r = vase_diameter / 2;
+
+function prof_r(t) = base_r * (1 + ripple_depth * cos(ripple_count * t));
+
+outer_pts = [ for (i = [0 : segments - 1])
+  let (t = i * 360 / segments)
+  let (r = prof_r(t))
+  [r * cos(t), r * sin(t)] ];
+
+inner_pts = [ for (i = [0 : segments - 1])
+  let (t = i * 360 / segments)
+  let (r = prof_r(t) - wall_thickness)
+  [r * cos(t), r * sin(t)] ];
+
+module ring_2d() {
+  difference() {
+    polygon(outer_pts);
+    polygon(inner_pts);
+  }
+}
+
+union() {
+  // 瓶身：twist 扭曲 + scale 收口
+  linear_extrude(height = vase_height, twist = twist_angle, slices = slices, scale = top_scale)
+    ring_2d();
+  // 瓶底：同轮廓薄片封口
+  linear_extrude(height = bottom_thickness)
+    polygon(outer_pts);
+}
 `,
     verifiable: true,
   },

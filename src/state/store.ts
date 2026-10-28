@@ -11,6 +11,7 @@ import { parseCustomizer } from '../core/scad-parser.js';
 import { coerceParamValue, mergeParamValues, valuesFromParams } from '../engine/defines.js';
 import { compile } from '../engine/compiler.js';
 import type { CompileResult, ParamValue, ParamValues } from '../engine/types.js';
+import { logger } from '../core/logger.js';
 import { getCjkFont } from '../storage/fonts.js';
 
 export type ChatRole = 'user' | 'assistant' | 'system';
@@ -249,7 +250,31 @@ export class Store {
       compileError: null,
     };
     this.emit();
+    logger.info('project', `载入项目「${project.name}」`, `${project.source.length} 字符`);
     if (project.source.trim()) this.scheduleCompile(0);
+  }
+
+  /** 从历史快照恢复源码与参数值。 */
+  restoreSnapshot(source: string, values: ParamValues): void {
+    this.compileGeneration++;
+    const parsed = parseCustomizer(source);
+    this.state = {
+      ...this.state,
+      project: {
+        ...this.state.project,
+        source,
+        paramValues: mergeParamValues(parsed.params, values),
+        updatedAt: Date.now(),
+      },
+      params: parsed.params,
+      hiddenGroups: parsed.hiddenGroups,
+      compile: null,
+      compiling: false,
+      compileError: null,
+    };
+    this.emit();
+    logger.info('history', '恢复历史版本', `${source.length} 字符`);
+    if (source.trim()) this.scheduleCompile(0);
   }
 
   /** 手动触发编译（工具栏按钮 / AI 应用后）。 */
@@ -287,6 +312,16 @@ export class Store {
         fonts: font ? [{ name: font.name, data: font.data }] : undefined,
       });
       if (generation !== this.compileGeneration) return;
+      if (result.ok) {
+        const size = result.summary?.size;
+        logger.info(
+          'compile',
+          `编译成功 ${result.durationMs} ms`,
+          size ? `${size[0].toFixed(1)}×${size[1].toFixed(1)}×${size[2].toFixed(1)} mm` : undefined
+        );
+      } else {
+        logger.warn('compile', '编译失败', firstError(result));
+      }
       this.patch({
         compile: result,
         compiling: false,
@@ -294,10 +329,12 @@ export class Store {
       });
     } catch (e) {
       if (generation !== this.compileGeneration) return;
+      const message = e instanceof Error ? e.message : String(e);
+      logger.error('compile', '编译异常', message);
       this.patch({
         compile: null,
         compiling: false,
-        compileError: e instanceof Error ? e.message : String(e),
+        compileError: message,
       });
     }
   }
