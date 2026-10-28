@@ -8,3 +8,4 @@ declare const __APP_AUTHOR__: string | undefined;
 
 export const APP_VERSION = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : 'dev';
 export const APP_AUTHOR = typeof __APP_AUTHOR__ === 'string' ? __APP_AUTHOR__ : 'VitasGuo';
+export const REPO_URL = 'https://github.com/VitasGuo/ParametricModelMakerPlugin4SM_orca';

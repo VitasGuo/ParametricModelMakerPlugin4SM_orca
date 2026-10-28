@@ -1,9 +1,7 @@
 /** 关于弹窗：版本、作者、许可证与仓库地址。 */
 
-import { APP_AUTHOR, APP_VERSION } from '../version.js';
+import { APP_AUTHOR, APP_VERSION, REPO_URL } from '../version.js';
 import { el, modal } from './dom.js';
-
-const REPO_URL = 'https://github.com/VitasGuo/ParametricModelMakerPlugin4SM_orca';
 
 export function openAboutModal(): void {
   const repo = el('a', 'about-link', [REPO_URL]);

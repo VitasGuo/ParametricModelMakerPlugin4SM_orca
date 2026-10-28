@@ -23,7 +23,7 @@ import { Store, type AppState, type ChatEntry } from '../state/store.js';
 import { langToggleLabel, toggleLang } from '../i18n.js';
 import { logger } from '../core/logger.js';
 import { autoNameSource, pushHistory } from '../storage/history.js';
-import { APP_AUTHOR, APP_VERSION } from '../version.js';
+import { APP_AUTHOR, APP_VERSION, REPO_URL } from '../version.js';
 import { Viewer, type ViewName } from '../viewer/viewer.js';
 import { CodeEditor } from '../editor/editor.js';
 import { ChatPanel } from './chat.js';
@@ -175,10 +175,18 @@ export class App {
     const right = el('div', 'panel panel-right');
 
     const main = el('div', 'main', [left, center, right]);
+    const repoLink = el('a', 'statusbar-link', ['GitHub']);
+    repoLink.href = REPO_URL;
+    repoLink.target = '_blank';
+    repoLink.rel = 'noreferrer noopener';
+    repoLink.title = REPO_URL;
+
     const footer = el('div', 'statusbar', [
       el('span', '', [`AI 参数化模型 v${APP_VERSION}`]),
       el('span', 'spacer'),
       el('span', '', [`开发者 ${APP_AUTHOR} · GPL-2.0`]),
+      el('span', 'statusbar-sep', ['·']),
+      repoLink,
     ]);
     root.append(topbar, main, footer);
 

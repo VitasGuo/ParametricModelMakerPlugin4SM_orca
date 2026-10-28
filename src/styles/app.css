@@ -1156,6 +1156,19 @@ button {
   flex: 1;
 }
 
+.statusbar-sep {
+  color: var(--muted-2);
+}
+
+.statusbar-link {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.statusbar-link:hover {
+  text-decoration: underline;
+}
+
 /* ---------------- about / logs / history ---------------- */
 
 .about-head {
