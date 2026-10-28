@@ -1,15 +1,13 @@
-﻿/**
+/**
  * 模型配置持久化。
  *
- * 纯静态网页没有后端，API Key 只能存在浏览器：
- * - 默认 localStorage（明文，仅本机；页面无第三方脚本，仍建议个人设备使用）
- * - 用户可关闭"保存 Key"，此时 Key 只留在本次会话内存中
+ * 纯静态网页没有后端，API Key 以明文保存在本机 `localStorage`；
+ * 只有你选择的 provider 会收到它。本机泄露风险由用户自行承担。
  */
 
 import { PROVIDERS, type WebModelConfig } from './providers.js';
 
 const STORAGE_KEY = 'model-lab-web:config';
-let sessionConfig: WebModelConfig | null = null;
 
 export function defaultConfig(): WebModelConfig {
   return {
@@ -19,57 +17,43 @@ export function defaultConfig(): WebModelConfig {
     model: 'deepseek-flash',
     apiKey: '',
     proxyUrl: 'http://127.0.0.1:17329/proxy',
-    saveApiKey: true,
   };
 }
 
 export function loadConfig(): WebModelConfig | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return sessionConfig;
+    if (!raw) return null;
     const parsed = JSON.parse(raw) as WebModelConfig;
     if (!parsed || typeof parsed !== 'object' || !(parsed.provider in PROVIDERS)) {
-      return sessionConfig;
+      return null;
     }
-    const cfg: WebModelConfig = {
-      ...defaultConfig(),
-      ...parsed,
-      saveApiKey: parsed.saveApiKey !== false,
+    return {
+      provider: parsed.provider,
+      model: parsed.model ?? '',
+      apiKey: parsed.apiKey ?? '',
+      baseUrl: parsed.baseUrl,
+      proxyUrl: parsed.proxyUrl ?? defaultConfig().proxyUrl,
+      reasoningEffort: parsed.reasoningEffort,
+      vision: parsed.vision,
     };
-    if (!cfg.apiKey && sessionConfig?.apiKey && sessionConfig.provider === cfg.provider) {
-      cfg.apiKey = sessionConfig.apiKey;
-    }
-    return cfg;
   } catch {
-    return sessionConfig;
+    return null;
   }
 }
 
 export function saveConfig(cfg: WebModelConfig): void {
-  sessionConfig = cfg;
   try {
-    if (cfg.saveApiKey === false) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...cfg, apiKey: '' }));
-    } else {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg));
-    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg));
   } catch {
-    // localStorage 不可用（隐私模式）时退回会话内存
+    // localStorage 不可用（隐私模式）时配置只在内存中保留到刷新
   }
 }
 
 export function clearConfig(): void {
-  sessionConfig = null;
   try {
     localStorage.removeItem(STORAGE_KEY);
   } catch {
     // ignore
   }
-}
-
-/** UI 展示用：只露前 4 位和后 4 位。 */
-export function maskKey(key: string): string {
-  if (!key) return '未填写';
-  if (key.length <= 8) return '••••';
-  return `${key.slice(0, 4)}…${key.slice(-4)}`;
 }

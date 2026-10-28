@@ -146,10 +146,8 @@ const en: Record<string, string> = {
   '视觉模型': 'Vision Model',
   '视觉 Base URL': 'Vision Base URL',
   'Base URL（可选）': 'Base URL (optional)',
-  '把 API Key 保存在本机浏览器（关闭则仅本次会话有效）':
-    'Save API key in this browser (off = session only)',
-  'Key 只存在你的浏览器里，请求直接发往你选择的 provider；本应用没有后端，不会上传 Key。':
-    'The key stays in your browser and is sent directly to your provider. This app has no backend and never uploads it.',
+  'API Key 以明文保存在本机浏览器的 localStorage，只会发送给你选择的 provider；本应用没有后端。本机泄露风险由你自行承担。':
+    'The API key is stored in plain text in this browser’s localStorage and is only sent to your chosen provider. This app has no backend; local exposure risk is yours to accept.',
   '启用视觉子模型（把三视图描述成文本，提升形状审核准确率）':
     'Enable vision sub-model (describe the three views for better shape review)',
   '中文字体（可选）': 'CJK font (optional)',

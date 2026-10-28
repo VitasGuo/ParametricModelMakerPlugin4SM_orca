@@ -123,8 +123,6 @@ export const PROVIDERS: Record<ModelProvider, ProviderMeta> = {
 export interface WebModelConfig extends ModelConfig {
   /** 通用代理地址；填写后所有请求都走它。 */
   proxyUrl?: string;
-  /** 是否把 API Key 存到 localStorage（默认 true，关闭则仅本次会话）。 */
-  saveApiKey?: boolean;
 }
 
 export interface CallResult {

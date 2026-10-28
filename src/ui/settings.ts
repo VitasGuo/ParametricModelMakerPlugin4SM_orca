@@ -29,9 +29,6 @@ export function openSettingsModal(
   });
 
   const proxyInput = input('text', cfg.proxyUrl ?? '', 'https://你的代理.workers.dev');
-  const saveKeyCheck = el('input', '');
-  saveKeyCheck.type = 'checkbox';
-  saveKeyCheck.checked = cfg.saveApiKey !== false;
 
   const reasonSelect = select([
     { value: 'none', label: 'none（推荐，结构化输出更快）' },
@@ -137,11 +134,8 @@ export function openSettingsModal(
       el('div', 'full', [providerNote]),
       el('div', 'full', [corsNote]),
       proxyWrap,
-      el('div', 'full', [
-        el('label', 'check-row', [saveKeyCheck, '把 API Key 保存在本机浏览器（关闭则仅本次会话有效）']),
-      ]),
       el('div', 'full settings-note', [
-        'Key 只存在你的浏览器里，请求直接发往你选择的 provider；本应用没有后端，不会上传 Key。',
+        'API Key 以明文保存在本机浏览器的 localStorage，只会发送给你选择的 provider；本应用没有后端。本机泄露风险由你自行承担。',
       ]),
       el('div', 'full settings-note', [
         '中文 text()：OpenSCAD 内置字体不含 CJK。上传系统字体（如 simhei.ttf / msyh.ttc）后，在源码里用 font="SimHei" 引用。字体文件只存在本机 IndexedDB。',
@@ -184,7 +178,6 @@ export function openSettingsModal(
       apiKey: keyInput.value.trim(),
       baseUrl: baseInput.value.trim() || undefined,
       proxyUrl: proxyInput.value.trim() || undefined,
-      saveApiKey: saveKeyCheck.checked,
     };
     if (provider === 'sensenova') {
       next.reasoningEffort = reasonSelect.value as 'none' | 'low' | 'medium' | 'high';

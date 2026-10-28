@@ -214,7 +214,7 @@ function withProxy(
   vision: NonNullable<WebModelConfig['vision']>,
   proxyUrl?: string
 ): WebModelConfig {
-  return { ...vision, proxyUrl, saveApiKey: false };
+  return { ...vision, proxyUrl };
 }
 
 function injectVisionDescription(userText: string, desc: string): string {

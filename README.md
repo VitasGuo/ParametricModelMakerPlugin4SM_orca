@@ -30,7 +30,7 @@
 - **导出**：STL、3MF、`.scad`（含当前参数值）、项目 JSON
 - **中英双语**：顶栏一键切换，保留当前项目与编译状态
 - **本地 AI 代理**：内置 Node 中继（`127.0.0.1:17329`），解决 SenseNova / GLM / OpenAI 的浏览器 CORS 限制
-- **纯静态 + BYOK**：无后端，API Key 只存在本机浏览器
+- **纯静态 + BYOK**：无后端，API Key 明文保存在本机浏览器 localStorage（风险自负）
 
 ## 一键安装到 Snapmaker Orca
 
@@ -169,7 +169,7 @@ ParametricModelMakerPlugin4SM_orca/
 - **许可证**：OpenSCAD WASM 为 GPL-2.0，本项目整体采用 GPL-2.0-only。
 - **WASM 体积**：`openscad.wasm` 约 10.6 MB（gzip 3.4 MB），首次加载需要下载；字体模块按需加载。
 - **中文 `text()`**：内置字体不含 CJK；需在设置页上传系统中文字体，并在源码里用 `font="字体族名"` 引用。
-- **API Key 在浏览器**：纯静态 BYOK 模式的固有风险；建议在个人设备使用，不要把带 Key 的页面公开分享。
+- **API Key 明文在浏览器**：纯静态 BYOK 模式的固有风险，本机泄露由用户自行承担；建议只在个人设备使用，不要把带 Key 的页面公开分享，也不要把 Key 写进仓库或截图。
 - **Orca 升级**：会覆盖 `index.html`，重跑 `install.bat` 即可。
 - **下载**：Orca 内 STL / 3MF 下载走 WebView2 默认策略；若被宿主拦截，需要后续接原生桥接。
 
