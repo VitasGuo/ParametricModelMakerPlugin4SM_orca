@@ -138,6 +138,7 @@ const en: Record<string, string> = {
   '思考力度（SenseNova）': 'Reasoning effort (SenseNova)',
   '视觉模型名': 'Vision model name',
   '视觉模型 API Key': 'Vision API key',
+  '视觉 API Key': 'Vision API key',
   '留空则复用主模型 Key（同 provider 时）':
     'Leave empty to reuse the main key (same provider)',
   可选: 'Optional',
