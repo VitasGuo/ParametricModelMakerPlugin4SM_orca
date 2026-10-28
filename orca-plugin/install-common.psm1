@@ -128,7 +128,16 @@ WshShell.Run """$NodePath"" ""$proxyPath""", 0, False
     $shortcut.Description = 'Parametric Model Maker local AI proxy'
     $shortcut.Save()
 
-    $listening = Get-NetTCPConnection -LocalPort 17329 -State Listen -ErrorAction SilentlyContinue
+    $listening = Get-NetTCPConnection -LocalPort 17329 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($listening) {
+        # 端口被开发用的旧进程占用时，换成本机安装副本，保证开机启动项与运行进程一致
+        $proc = Get-CimInstance Win32_Process -Filter "ProcessId=$($listening.OwningProcess)" -ErrorAction SilentlyContinue
+        if (-not $proc -or $proc.CommandLine -notlike "*$proxyPath*") {
+            Stop-Process -Id $listening.OwningProcess -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Milliseconds 500
+            $listening = $null
+        }
+    }
     if (-not $listening) {
         Start-Process -FilePath 'wscript.exe' -ArgumentList "`"$vbsPath`"" -WindowStyle Hidden
         for ($i = 0; $i -lt 20; $i++) {
