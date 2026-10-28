@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.vite/
+*.local
+.DS_Store
+.env
+.env.*
+*.log
+
+# 内部开发笔记（不公开）
+process.md
+traps.md

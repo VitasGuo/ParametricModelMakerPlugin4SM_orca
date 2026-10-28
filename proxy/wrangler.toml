@@ -1,0 +1,7 @@
+name = "model-lab-web-proxy"
+main = "worker.js"
+compatibility_date = "2026-10-01"
+
+[vars]
+# 建议改成你的网页域名，例如 "https://model-lab.example.com"
+ALLOW_ORIGIN = "*"
