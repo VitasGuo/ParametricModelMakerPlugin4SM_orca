@@ -191,6 +191,11 @@ const en: Record<string, string> = {
   '尚未配置模型：点右上角「设置」填入 Provider / 模型 / API Key。纯静态网页，Key 只存在本机浏览器。':
     'No model configured: open “Settings” (top right) and enter Provider / Model / API Key. This is a static page; the key stays in your browser.',
 
+  // provider labels
+  '商汤 SenseNova': 'SenseNova',
+  '智谱 GLM': 'Zhipu GLM',
+  '自定义 OpenAI 兼容端点': 'Custom OpenAI-compatible endpoint',
+
   // provider notes
   '国内直连，纯文本，价格低': 'Direct in China, text-only, low cost',
   '一个 Key 聚合多家模型，含视觉模型；适合作为通用入口':
