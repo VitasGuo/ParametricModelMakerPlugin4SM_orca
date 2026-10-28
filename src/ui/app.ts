@@ -52,7 +52,6 @@ export class App {
   private readonly emptyOverlay: HTMLElement;
   private readonly codePane: HTMLElement;
   private readonly viewerEl: HTMLElement;
-  private readonly mainEl: HTMLElement;
   private readonly codeStatus: HTMLElement;
   private readonly codeLog: HTMLElement;
   private readonly previewTab: HTMLButtonElement;
@@ -114,13 +113,12 @@ export class App {
     langBtn.setAttribute('data-i18n-skip', '');
 
     const topbar = el('div', 'topbar', [
-      el('div', 'traffic', [
-        trafficDot('close', '新建项目', () => this.newProject()),
-        trafficDot('min', '保存项目', () => this.saveCurrent()),
-        trafficDot('zoom', '导出 STL', () => this.exportStl()),
-      ]),
       el('div', 'brand', [brandIcon, el('span', 'brand-name', ['AI 参数化模型'])]),
       menuBar,
+      el('div', 'topbar-actions', [
+        button('保存', 'btn btn-sm', () => this.saveCurrent()),
+        button('导出', 'btn btn-sm btn-ghost', () => this.exportStl()),
+      ]),
       el('div', 'topbar-center', [this.projectName]),
       el('div', 'topbar-group', [
         this.configBadge,
@@ -176,13 +174,13 @@ export class App {
     const left = el('div', 'panel panel-left');
     const right = el('div', 'panel panel-right');
 
-    this.mainEl = el('div', 'main', [left, center, right]);
+    const main = el('div', 'main', [left, center, right]);
     const footer = el('div', 'statusbar', [
       el('span', '', [`AI 参数化模型 v${APP_VERSION}`]),
       el('span', 'spacer'),
       el('span', '', [`开发者 ${APP_AUTHOR} · GPL-2.0`]),
     ]);
-    root.append(topbar, this.mainEl, footer);
+    root.append(topbar, main, footer);
 
     // 快捷键：Ctrl/Cmd + S 保存项目，Ctrl/Cmd + O 打开项目
     document.addEventListener('keydown', (event) => {
@@ -329,7 +327,6 @@ export class App {
     this.codeTab.classList.toggle('active', state.codeOpen);
     this.codePane.classList.toggle('hidden', !state.codeOpen);
     this.viewerEl.classList.toggle('pane-hidden', state.codeOpen);
-    this.mainEl.classList.toggle('code-mode', state.codeOpen);
     if (state.codeOpen && !this.codeWasOpen) {
       requestAnimationFrame(() => this.editor.requestMeasure());
     }
@@ -750,14 +747,6 @@ function closeMenus(): void {
 document.addEventListener('click', (event) => {
   if (!(event.target as Element).closest('.menu-wrap')) closeMenus();
 });
-
-function trafficDot(kind: 'close' | 'min' | 'zoom', label: string, onClick: () => void): HTMLButtonElement {
-  const dot = button('', `traffic-dot ${kind}`, onClick);
-  dot.type = 'button';
-  dot.title = label;
-  dot.setAttribute('aria-label', label);
-  return dot;
-}
 
 const GEAR_ICON =
   '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" ' +

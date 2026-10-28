@@ -90,13 +90,17 @@ foot_profile = [
   [0, foot_height - 2]
 ];
 
-difference() {
-  union() {
-    rotate_extrude() polygon(bowl_outer);
-    translate([0, 0, -foot_height]) rotate_extrude() polygon(foot_profile);
+// 整体抬到热床上：足底 z=0，足顶与碗底重叠 1mm（避免只共面导致两段分离）
+translate([0, 0, foot_height - 1])
+  difference() {
+    union() {
+      rotate_extrude() polygon(bowl_outer);
+      translate([0, 0, 1 - foot_height]) rotate_extrude() polygon(foot_profile);
+      // 隐藏连接柱：跨过足顶(z=1)与碗底(z=0)，确保两段在布尔运算后是同一实体
+      translate([0, 0, -1]) cylinder(h = 4, r = foot_r - 1);
+    }
+    rotate_extrude() polygon(bowl_inner);
   }
-  rotate_extrude() polygon(bowl_inner);
-}
 `,
     verifiable: true,
   },
@@ -491,17 +495,19 @@ $fn = 64;
 outer_r = outer_diameter / 2;
 inner_r = outer_r - wall_thickness;
 
-difference() {
-  sphere(r = outer_r);
-  sphere(r = inner_r);
-  // 开口：切掉顶部球冠。切割立方体必须【从开口平面向上】延伸，
-  // 不能 center=true 居中——居中会把下半也盖住，整个球被切没
-  if (opening_angle > 0) {
-    opening_z = outer_r * cos(opening_angle / 2);
-    translate([-outer_r * 1.1, -outer_r * 1.1, opening_z])
-      cube([outer_r * 2.2, outer_r * 2.2, outer_r * 2]);
+// 球心原本在原点会有一半埋到热床下，整体抬高一个半径
+translate([0, 0, outer_r])
+  difference() {
+    sphere(r = outer_r);
+    sphere(r = inner_r);
+    // 开口：切掉顶部球冠。切割立方体必须【从开口平面向上】延伸，
+    // 不能 center=true 居中——居中会把下半也盖住，整个球被切没
+    if (opening_angle > 0) {
+      opening_z = outer_r * cos(opening_angle / 2);
+      translate([-outer_r * 1.1, -outer_r * 1.1, opening_z])
+        cube([outer_r * 2.2, outer_r * 2.2, outer_r * 2]);
+    }
   }
-}
 `,
     verifiable: true,
   },
@@ -590,7 +596,9 @@ module organic_shape() {
   }
 }
 
-organic_shape();
+// 球体凸包最低点会低于 z=0，整体抬高到热床（留 0.1mm 补偿多面体逼近误差）
+bottom_extent = max(size * 0.5, size * stretch * flatness + size * 0.4) - 0.1;
+translate([0, 0, bottom_extent]) organic_shape();
 `,
     verifiable: false,
   },
@@ -941,7 +949,7 @@ difference() {
     applies: '堆叠收纳盒、嵌套箱、可摞周转盒',
     idea: '范例 17 的圆角盒 + 底部外裙环；上层盒底落入下层裙环内实现定位',
     points: [
-      '裙环 = offset(rim_depth+gap) 外轮廓 − offset(gap) 外轮廓，内边界与盒壁之间留 rim_gap 让上层嵌入',
+      '裙环 = offset(rim_depth+gap) 外轮廓 − offset(-0.5) 内轮廓：内边与盒壁重叠 0.5mm，裙环与盒身连成一体',
       '裙环高度 rim_height < 盒高 1/3',
       '演算：裙外尺寸 = 盒外尺寸 + 2*(rim_depth + rim_gap)',
     ],
@@ -974,14 +982,16 @@ difference() {
     // 盒身
     linear_extrude(box_height)
       rounded_square(box_length, box_width, fillet_radius);
-    // 底裙环（上层盒底嵌进来）
-    linear_extrude(rim_height)
-      difference() {
-        offset(r = rim_depth + rim_gap)
-          rounded_square(box_length, box_width, fillet_radius);
-        offset(r = rim_gap)
-          rounded_square(box_length, box_width, fillet_radius);
-      }
+    // 底裙环（上层盒底嵌进来）：内边向内缩 0.5mm 与盒壁实体重叠，避免悬空；
+    // 整体抬高 0.2mm，避开与盒底共面导致的非流形边
+    translate([0, 0, 0.2])
+      linear_extrude(rim_height)
+        difference() {
+          offset(r = rim_depth + rim_gap)
+            rounded_square(box_length, box_width, fillet_radius);
+          offset(r = -0.5)
+            rounded_square(box_length, box_width, fillet_radius);
+        }
   }
   // 内腔
   translate([0, 0, bottom_thickness])
@@ -1308,12 +1318,11 @@ profile = concat([[0, 0]], curve_pts, [[x_max, 0]]);
 union() {
   // 钟形主体（实心摆件）
   rotate_extrude() polygon(profile);
-  // 圆环底座
-  translate([0, 0, -base_height])
-    difference() {
-      cylinder(h = base_height, d = base_diameter);
-      translate([0, 0, -0.5]) cylinder(h = base_height + 1, d = base_diameter - 16);
-    }
+  // 圆环底座（放在 z=0，与钟形主体底部重叠）
+  difference() {
+    cylinder(h = base_height, d = base_diameter);
+    translate([0, 0, -0.5]) cylinder(h = base_height + 1, d = base_diameter - 16);
+  }
 }
 `,
     verifiable: true,
@@ -1630,9 +1639,8 @@ side_profile = [
   [head_width * 0.10, 0]
 ];
 
-// 底座
-translate([0, -head_width * 0.6, -6])
-  cylinder(h = 6, d1 = head_width * 0.9, d2 = head_width * 0.8, $fn = 48);
+// 底座：放在 z=0 且与两块头板在底部重叠，整件连成一体
+cylinder(h = 6, d1 = head_width * 0.9, d2 = head_width * 0.8, $fn = 48);
 
 union() {
   // 侧脸板（YZ 平面立起，面朝 +x）
@@ -1641,7 +1649,8 @@ union() {
       polygon(side_profile);
 
   // 正面板（XY 平面立起，面朝 +z 的观察者），带两只"孔眼"
-  translate([-plate_thickness / 2, 0, 0])
+  // z 向上抬 0.4*head_height + 0.12*head_width，让板底落在 z=0 而不是一半埋到床下
+  translate([-plate_thickness / 2, 0, head_height * 0.4 + head_width * 0.12])
     rotate([90, 0, 0])
       translate([0, 0, -plate_thickness / 2])
         linear_extrude(height = plate_thickness, center = true)
@@ -1904,18 +1913,20 @@ difference() {
     // 背板（X 居中）
     translate([-plate_width / 2, 0, 0])
       cube([plate_width, plate_thickness, plate_height]);
-    // 水平臂
+    // 水平臂：末端收在关节柱内部，避免端面共面
     translate([0, plate_thickness - 1, arm_z])
       rotate([-90, 0, 0])
-        cylinder(h = arm_length, r = rod_radius);
+        cylinder(h = arm_length + 1, r = rod_radius);
     // 弯钩：圆弧从臂端向上回卷
     translate([0, arm_end - hook_radius, arm_z])
       rotate([0, -90, 0])
         rotate_extrude(angle = 90)
           translate([hook_radius, 0])
             circle(r = rod_radius);
-    // 关节球：臂与弯钩实体重叠
-    translate([0, arm_end, arm_z]) sphere(r = rod_radius);
+    // 关节柱：略大于杆径，完整包住臂端与弯钩端面，避免相切产生开放边
+    translate([0, arm_end - 2, arm_z])
+      rotate([-90, 0, 0])
+        cylinder(h = 4, r = rod_radius + 0.4);
   }
   // 螺丝孔（贯穿背板）
   for (p = [[-plate_width * 0.28, plate_height * 0.82],
@@ -2009,8 +2020,8 @@ difference() {
   for (i = [0 : slots - 1]) {
     z = bottom_thickness + i * (gap + separator);
     // 前面开放，卡片沿 +Y 滑入
-    translate([wall_thickness - 0.5, -1, z])
-      cube([card_length + 1, box_w - back_thickness + 1, gap]);
+    translate([wall_thickness, -1, z])
+      cube([card_length, box_w - back_thickness + 1, gap]);
   }
 }
 `,
@@ -2409,11 +2420,14 @@ difference() {
     cube([min(slot_depth, cube_size - 2) + 1, cube_size * 0.3, slot_width]);
 }
 
-// 顶部公差柱：柱径按间距夹紧，避免相邻柱粘连
+// 顶部公差柱：柱径按间距夹紧，避免相邻柱粘连；
+// Y 方向避开中心通孔，否则中间柱会悬在孔里成为独立零件
 for (i = [0 : pin_count - 1]) {
   spacing = cube_size / (pin_count + 1);
   d = min(pin_diameter, spacing * 0.7);
-  translate([spacing * (i + 1), cube_size / 2, cube_size - 1])
+  hole_r = min(hole_diameter, cube_size - 4) / 2;
+  pin_y = max(cube_size * 0.18, cube_size / 2 - hole_r - d / 2 - 1);
+  translate([spacing * (i + 1), pin_y, cube_size - 1])
     cylinder(h = pin_height + 1, d = d);
 }
 `,
