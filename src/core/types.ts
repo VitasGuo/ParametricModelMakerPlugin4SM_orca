@@ -156,12 +156,4 @@ export interface ModelConfig {
    * 导致 content 为空（traps.md #4）。想启用思考选 low/medium/high。
    */
   reasoningEffort?: 'none' | 'low' | 'medium' | 'high';
-  /** 视觉子模型配置（可选）。若设置，截图先由子模型描述成文本，再交给主模型决策。 */
-  vision?: {
-    provider: ModelProvider;
-    /** 多模态模型名，如 `sensenova-6.7-flash-lite`、`glm-4v`、`gpt-4o`。 */
-    model: string;
-    apiKey: string;
-    baseUrl?: string;
-  };
 }

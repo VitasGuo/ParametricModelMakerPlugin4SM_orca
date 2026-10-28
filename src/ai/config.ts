@@ -35,7 +35,6 @@ export function loadConfig(): WebModelConfig | null {
       baseUrl: parsed.baseUrl,
       proxyUrl: parsed.proxyUrl ?? defaultConfig().proxyUrl,
       reasoningEffort: parsed.reasoningEffort,
-      vision: parsed.vision,
     };
   } catch {
     return null;

@@ -124,7 +124,7 @@ export class Viewer {
 
   /**
    * 三视图拼图：等轴 / 正面 / 顶部，横向排列并带标签。
-   * 用于喂给视觉模型，单张图比多张图省 token。
+   * 用于喂给支持图片输入的主模型，单张图比多张图省 token。
    */
   captureContactSheet(): string {
     if (!this.mesh) return '';

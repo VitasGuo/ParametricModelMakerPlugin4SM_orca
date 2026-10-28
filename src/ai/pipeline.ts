@@ -4,7 +4,7 @@
  * 与插件的区别：
  *  - 不做自动重试，失败结果照常返回并附 rerollContext（用户点"重抽"）
  *  - 验证用 OpenSCAD WASM 真实编译（lint → 编译 → 空模型/尺寸检查 → 几何审核）
- *  - 几何审核优先用三视图截图 + 视觉子模型；没有视觉时退化为网格摘要 + 设计计划
+ *  - 几何审核把三视图直接发给支持图片输入的主模型；纯文本模型退化为网格摘要 + 设计计划
  */
 
 import type { AiAction, AiRequest, AiResponse } from '../core/types.js';
@@ -24,23 +24,15 @@ export async function chat(request: AiRequest, cfg: WebModelConfig, verify: Veri
   const system = SYSTEM_PROMPT;
   let userText = buildUserContext(request.userMessage, request.state);
   const screenshot = request.state.previewScreenshot;
-  if (!screenshot) {
+  const passImageToMain = !!screenshot && isMultimodal(cfg);
+  if (!passImageToMain) {
     userText = userText.replace(
       '【模型预览截图已随消息附上，请结合视觉判断】',
-      '【当前没有可用的预览截图，请根据源码、参数与设计计划判断】'
+      screenshot
+        ? '【当前模型不支持图片输入，请根据源码、参数与设计计划判断】'
+        : '【当前没有可用的预览截图，请根据源码、参数与设计计划判断】'
     );
   }
-
-  if (screenshot && cfg.vision) {
-    try {
-      const desc = await describeImage(withProxy(cfg.vision, cfg.proxyUrl), screenshot);
-      userText = injectVisionDescription(userText, desc);
-    } catch (e) {
-      userText += `\n\n【模型预览截图分析失败：${e instanceof Error ? e.message : String(e)}】`;
-    }
-  }
-
-  const passImageToMain = !!screenshot && !cfg.vision && isMultimodal(cfg);
   const isGenerative = request.state.scadSource.trim().length === 0;
   const temperature = isGenerative ? 0.7 : 0.3;
 
@@ -153,19 +145,7 @@ async function reviewDesign(
   const sys =
     '你是 3D 打印模型的几何审核员。根据用户需求、设计计划、真实编译结果与模型三视图，判断几何形状是否与需求相符。只输出严格 JSON：{"verdict":"pass"|"fail","reason":"一句话中文结论"}';
 
-  let visionText = '';
-  let passImage = false;
-  if (outcome.screenshot) {
-    if (cfg.vision) {
-      try {
-        visionText = await describeImage(withProxy(cfg.vision, cfg.proxyUrl), outcome.screenshot);
-      } catch {
-        visionText = '';
-      }
-    } else if (isMultimodal(cfg)) {
-      passImage = true;
-    }
-  }
+  const passImage = !!outcome.screenshot && isMultimodal(cfg);
 
   const user = [
     `用户需求：${userMessage}`,
@@ -177,7 +157,6 @@ async function reviewDesign(
     '本地自动疑点：',
     outcome.notes.length ? outcome.notes.map((n) => `- ${n}`).join('\n') : '- 无',
     '',
-    visionText ? `模型三视图分析（视觉子模型）：${visionText}` : '',
     passImage ? '模型三视图已随消息附上。' : '（没有视觉信息，只能根据几何摘要与设计计划判断）',
     '',
     '请判断几何轮廓（形状类型 / 开口性 / 比例）是否与需求相符。表面光滑度、美观度不算 fail。碗/盒/杯类容器口部必须开口。',
@@ -196,33 +175,6 @@ async function reviewDesign(
   } catch {
     return { pass: true, reason: '（审核调用失败，视为通过）' };
   }
-}
-
-async function describeImage(vision: WebModelConfig, screenshot: string): Promise<string> {
-  const prompt = `你在为 3D 打印参数化建模做视觉分析。请用简洁中文描述这张 3D 模型三视图（ISO/FRONT/TOP）：
-1. 模型整体形状（盒子/圆柱/组合体等）
-2. 大致尺寸比例（长宽高关系）
-3. 可见特征（孔/圆角/开口/分隔等）
-4. 视觉异常（模型缺失、变形、悬空、漏洞等）
-
-重点描述与用户意图相关的视觉特征，如有异常请明确指出。
-直接输出描述文本，不要 JSON、不要 markdown。限 200 字以内。`;
-  return (await callProvider(vision, '', prompt, screenshot, 0.2, [])).text;
-}
-
-function withProxy(
-  vision: NonNullable<WebModelConfig['vision']>,
-  proxyUrl?: string
-): WebModelConfig {
-  return { ...vision, proxyUrl };
-}
-
-function injectVisionDescription(userText: string, desc: string): string {
-  const placeholder = '【模型预览截图已随消息附上，请结合视觉判断】';
-  if (userText.includes(placeholder)) {
-    return userText.replace(placeholder, `【模型预览截图分析（视觉子模型）】\n${desc}`);
-  }
-  return `${userText}\n\n【模型预览截图分析（视觉子模型）】\n${desc}`;
 }
 
 function buildRerollFeedback(ctx: NonNullable<AiResponse['rerollContext']>): string {

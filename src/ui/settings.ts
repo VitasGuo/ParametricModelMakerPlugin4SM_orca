@@ -38,29 +38,6 @@ export function openSettingsModal(
   ]);
   reasonSelect.value = cfg.reasoningEffort ?? 'none';
 
-  const visionCheck = el('input', '');
-  visionCheck.type = 'checkbox';
-  visionCheck.checked = !!cfg.vision;
-
-  const visionProvider = select(
-    Object.values(PROVIDERS).map((meta) => ({ value: meta.id, label: meta.label }))
-  );
-  visionProvider.value = cfg.vision?.provider ?? 'openrouter';
-  const visionModel = input('text', cfg.vision?.model ?? 'google/gemini-2.5-flash', '视觉模型名');
-  const visionKey = input('password', cfg.vision?.apiKey ?? '', '视觉模型 API Key');
-  const visionBase = input('text', cfg.vision?.baseUrl ?? '', '默认使用官方地址');
-
-  const visionFields = el('div', 'settings-grid full', [
-    field('视觉 Provider', visionProvider),
-    field('视觉模型', visionModel),
-    field('视觉 API Key', visionKey, '留空则复用主模型 Key（同 provider 时）'),
-    field('视觉 Base URL', visionBase, '可选'),
-  ]);
-  visionFields.style.display = visionCheck.checked ? '' : 'none';
-  visionCheck.addEventListener('change', () => {
-    visionFields.style.display = visionCheck.checked ? '' : 'none';
-  });
-
   const fontInput = input('file');
   fontInput.accept = '.ttf,.ttc,.otf';
   fontInput.style.display = 'none'; // 原生 file 控件文案随浏览器语言，改为自定义按钮触发
@@ -98,6 +75,7 @@ export function openSettingsModal(
 
   const corsNote = el('div', 'settings-note');
   const providerNote = el('div', 'settings-note');
+  const visionHint = el('div', 'settings-note full');
   const proxyWrap = el('div', 'full', [
     field('API 代理地址（可选）', proxyInput, '填写后所有 provider 请求都经此代理转发；仓库附带 Cloudflare Worker 模板'),
   ]);
@@ -114,6 +92,16 @@ export function openSettingsModal(
         : '该 provider 支持浏览器直连（或由你自己的端点放行 CORS）。';
     const reasonField = reasonSelect.parentElement;
     if (reasonField) reasonField.style.display = providerSelect.value === 'sensenova' ? '' : 'none';
+    refreshVisionHint();
+  }
+
+  function refreshVisionHint(): void {
+    const meta = PROVIDERS[providerSelect.value as ModelProvider];
+    const multimodal = meta.visionPattern.test(modelInput.value.trim());
+    visionHint.className = multimodal ? 'settings-note full' : 'settings-note warn full';
+    visionHint.textContent = multimodal
+      ? '当前模型支持图片输入：形状审核会把 ISO / FRONT / TOP 三视图直接发给它。'
+      : '当前模型不支持图片输入：形状审核只能依据网格摘要与设计计划。需要视觉审核请换用支持图片的模型（如 SenseNova 6.8 / GLM-4V / GPT-4o / Claude / Gemini）。';
   }
 
   providerSelect.addEventListener('change', () => {
@@ -122,6 +110,7 @@ export function openSettingsModal(
     baseInput.value = '';
     refreshProviderHints();
   });
+  modelInput.addEventListener('input', refreshVisionHint);
 
   const body = el('div', 'modal-body', [
     el('div', 'settings-grid', [
@@ -131,6 +120,7 @@ export function openSettingsModal(
       showKeyRow,
       field('Base URL（可选）', baseInput),
       field('思考力度（SenseNova）', reasonSelect),
+      visionHint,
       el('div', 'full', [providerNote]),
       el('div', 'full', [corsNote]),
       proxyWrap,
@@ -142,10 +132,6 @@ export function openSettingsModal(
       ]),
       el('div', 'full', [field('中文字体（可选）', el('div', 'font-pick-row', [pickFontButton, fontInput]))]),
       el('div', 'full', [fontStatus, clearFontButton]),
-      el('div', 'full', [
-        el('label', 'check-row', [visionCheck, '启用视觉子模型（把三视图描述成文本，提升形状审核准确率）']),
-      ]),
-      visionFields,
     ]),
   ]);
 
@@ -181,22 +167,6 @@ export function openSettingsModal(
     };
     if (provider === 'sensenova') {
       next.reasoningEffort = reasonSelect.value as 'none' | 'low' | 'medium' | 'high';
-    }
-    if (visionCheck.checked) {
-      const vp = visionProvider.value as ModelProvider;
-      const vm = visionModel.value.trim();
-      const vk = visionKey.value.trim() || (vp === provider ? next.apiKey : '');
-      if (vm && vk) {
-        next.vision = {
-          provider: vp,
-          model: vm,
-          apiKey: vk,
-          baseUrl: visionBase.value.trim() || undefined,
-        };
-      } else {
-        toast('视觉子模型需要模型名和 API Key', 'error');
-        return;
-      }
     }
 
     onSave(next);

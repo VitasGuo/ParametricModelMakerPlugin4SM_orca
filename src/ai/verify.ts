@@ -2,7 +2,7 @@
  * 用真实 OpenSCAD WASM 引擎验证 AI 生成的源码。
  *
  * 和插件的 scad-eval 近似求值不同：这里以编译 exit code、空模型检测、
- * 网格 bbox/体积为准，并用离屏三视图截图供视觉模型审核。
+ * 网格 bbox/体积为准，并用离屏三视图截图供支持图片输入的主模型审核。
  */
 
 import { compile } from '../engine/compiler.js';

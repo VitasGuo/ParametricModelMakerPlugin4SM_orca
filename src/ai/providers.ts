@@ -141,7 +141,7 @@ export class ProviderError extends Error {
   }
 }
 
-/** 调用主模型 / 视觉子模型（两者共用）。 */
+/** 调用主模型。 */
 export async function callProvider(
   cfg: WebModelConfig,
   system: string,

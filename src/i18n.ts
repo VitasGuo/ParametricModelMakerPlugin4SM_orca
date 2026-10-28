@@ -136,20 +136,13 @@ const en: Record<string, string> = {
   'https://你的代理.workers.dev': 'https://your-proxy.workers.dev',
   'none（推荐，结构化输出更快）': 'none (recommended, faster structured output)',
   '思考力度（SenseNova）': 'Reasoning effort (SenseNova)',
-  '视觉模型名': 'Vision model name',
-  '视觉模型 API Key': 'Vision API key',
-  '视觉 API Key': 'Vision API key',
-  '留空则复用主模型 Key（同 provider 时）':
-    'Leave empty to reuse the main key (same provider)',
-  可选: 'Optional',
-  '视觉 Provider': 'Vision Provider',
-  '视觉模型': 'Vision Model',
-  '视觉 Base URL': 'Vision Base URL',
   'Base URL（可选）': 'Base URL (optional)',
   'API Key 以明文保存在本机浏览器的 localStorage，只会发送给你选择的 provider；本应用没有后端。本机泄露风险由你自行承担。':
     'The API key is stored in plain text in this browser’s localStorage and is only sent to your chosen provider. This app has no backend; local exposure risk is yours to accept.',
-  '启用视觉子模型（把三视图描述成文本，提升形状审核准确率）':
-    'Enable vision sub-model (describe the three views for better shape review)',
+  '当前模型支持图片输入：形状审核会把 ISO / FRONT / TOP 三视图直接发给它。':
+    'This model accepts images: the ISO / FRONT / TOP views are sent to it directly for shape review.',
+  '当前模型不支持图片输入：形状审核只能依据网格摘要与设计计划。需要视觉审核请换用支持图片的模型（如 SenseNova 6.8 / GLM-4V / GPT-4o / Claude / Gemini）。':
+    'This model does not accept images: shape review relies on the mesh summary and design plan only. For visual review, choose a vision-capable model (e.g. SenseNova 6.8 / GLM-4V / GPT-4o / Claude / Gemini).',
   '中文字体（可选）': 'CJK font (optional)',
   移除字体: 'Remove font',
   选择字体文件: 'Choose font file',
@@ -167,7 +160,6 @@ const en: Record<string, string> = {
   '自定义 provider 需要填写 Base URL。': 'Custom provider requires a Base URL.',
   '自定义 provider 需要填写 Base URL': 'Custom provider requires a Base URL',
   '请填写模型名': 'Please enter a model name',
-  '视觉子模型需要模型名和 API Key': 'Vision sub-model needs a model name and API key',
   设置已保存: 'Settings saved',
   中文字体已移除: 'CJK font removed',
   '先配置模型和 API Key': 'Configure a model and API key first',
