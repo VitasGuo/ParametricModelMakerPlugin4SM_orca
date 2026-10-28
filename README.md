@@ -4,6 +4,7 @@
 >
 > An AI parametric model maker plugin for Snapmaker Orca, with a standalone OpenSCAD workbench.
 
+**仓库 / Repository**: https://github.com/VitasGuo/ParametricModelMakerPlugin4SM_orca<br>
 **开发者 / Developer**: VitasGuo · **许可证 / License**: [GPL-2.0-only](LICENSE)
 
 ---
