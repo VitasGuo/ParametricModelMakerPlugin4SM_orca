@@ -50,9 +50,10 @@ export function lintScad(source: string): LintIssue[] {
     issues.push({ level: 'error', message: '检测到 while 循环：OpenSCAD 不支持 while，必须用 for 或递归函数重写' });
   }
 
-  // 4. 壁厚类参数过薄（不可打印）
+  // 4. 壁厚类参数过薄（不可打印）；间隙/公差类参数不适用
   for (const p of params) {
     if (!/thickness|wall/i.test(p.name)) continue;
+    if (/clearance|gap|tolerance|fit/i.test(p.name)) continue;
     if (p.type === 'number' && typeof p.default === 'number' && p.default > 0 && p.default < 0.8) {
       issues.push({ level: 'warn', message: `参数 ${p.name} 默认值 ${p.default}mm 过薄（<0.8mm），FDM 打印难以成型` });
     }

@@ -52,6 +52,13 @@ describe('lintScad 语法与可打印性', () => {
     expect(issues.some((i) => i.level === 'warn' && i.message.includes('wall_thickness'))).toBe(true);
   });
 
+  it('间隙类参数（wall_clearance / gap）→ 不误报壁厚过薄', () => {
+    const issues = lintScad(
+      '/* [Fit] */\nwall_clearance = 0.3; // [0.15:0.6]\nslider_gap = 0.4; // [0.2:1]\ncube(10);'
+    );
+    expect(issues.filter((i) => i.level === 'warn')).toHaveLength(0);
+  });
+
   it('顶层变量重复赋值 → warn（last-wins）', () => {
     const issues = lintScad('x = 10;\nx = 20;\ncube(x);');
     expect(issues.some((i) => i.level === 'warn' && i.message.includes('赋值了 2 次'))).toBe(true);

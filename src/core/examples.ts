@@ -5,8 +5,8 @@
  *  - prompts.ts 调 examplesToPromptText() 把范例拼进 system prompt（AI 侧）
  *  - 范例库面板直接 import EXAMPLES 渲染列表，用户可一键载入（用户侧）
  *
- * code 必须是完整可运行、带 Customizer 注释协议的 SCAD。独立网页用真实
- * OpenSCAD WASM 编译验证，`verifiable` 字段保留用于兼容旧数据/标记复杂度。
+ * code 必须是完整可运行、带 Customizer 注释协议的 SCAD。全部范例由真实
+ * OpenSCAD WASM 编译 + tests/examples-real-engine.test.ts 结构审计回归。
  */
 
 /** 范例难度层级。 */
@@ -29,8 +29,6 @@ export interface ModelingExample {
   points: string[];
   /** 完整可运行 SCAD。 */
   code: string;
-  /** 本地求值器是否可验证。 */
-  verifiable: boolean;
 }
 
 export const EXAMPLES: ModelingExample[] = [
@@ -102,7 +100,6 @@ translate([0, 0, foot_height - 1])
     rotate_extrude() polygon(bowl_inner);
   }
 `,
-    verifiable: true,
   },
   {
     id: 2,
@@ -179,7 +176,6 @@ difference() {
   rotate_extrude() polygon(inner_profile);
 }
 `,
-    verifiable: true,
   },
   {
     id: 3,
@@ -242,7 +238,6 @@ scale([length / width, 1, 1])
     box_inner();
   }
 `,
-    verifiable: true,
   },
   {
     id: 3.5,
@@ -302,7 +297,6 @@ difference() {
   box_inner();
 }
 `,
-    verifiable: true,
   },
   {
     id: 4,
@@ -337,7 +331,6 @@ difference() {
     cube([length - 2*wall_thickness, width - 2*wall_thickness, height - bottom_thickness + 1]);
 }
 `,
-    verifiable: false,
   },
   {
     id: 5,
@@ -378,7 +371,6 @@ difference() {
   }
 }
 `,
-    verifiable: true,
   },
   {
     id: 6,
@@ -433,7 +425,6 @@ module lid() {
 box_body();
 lid();
 `,
-    verifiable: true,
   },
   {
     id: 7,
@@ -469,7 +460,6 @@ translate([length/2, width/2, thickness])
     text(text_content, size = text_size, font = "Liberation Sans",
          halign = "center", valign = "center");
 `,
-    verifiable: false,
   },
   {
     id: 8,
@@ -509,7 +499,6 @@ translate([0, 0, outer_r])
     }
   }
 `,
-    verifiable: true,
   },
   {
     id: 9,
@@ -559,7 +548,6 @@ module bolt() {
 
 bolt();
 `,
-    verifiable: true,
   },
   {
     id: 10,
@@ -600,7 +588,6 @@ module organic_shape() {
 bottom_extent = max(size * 0.5, size * stretch * flatness + size * 0.4) - 0.1;
 translate([0, 0, bottom_extent]) organic_shape();
 `,
-    verifiable: false,
   },
   {
     id: 11,
@@ -650,7 +637,6 @@ union() {
   }
 }
 `,
-    verifiable: true,
   },
   {
     id: 12,
@@ -691,7 +677,6 @@ difference() {
     cylinder(h = crater_depth + 1, d = crater_diameter);
 }
 `,
-    verifiable: true,
   },
   {
     id: 13,
@@ -733,7 +718,6 @@ rotate([90, 0, 0])
   linear_extrude(height = thickness)
     polygon(profile);
 `,
-    verifiable: true,
   },
   {
     id: 14,
@@ -777,7 +761,6 @@ for (i = [1 : ripple_count]) {
   }
 }
 `,
-    verifiable: true,
   },
   {
     id: 15,
@@ -851,7 +834,6 @@ difference() {
   rotate_extrude() polygon(inner_profile);
 }
 `,
-    verifiable: true,
   },
   {
     id: 16,
@@ -897,7 +879,6 @@ translate([cup_r - embed, 0, cup_height / 2])
       translate([(handle_out + handle_in) / 2, 0])
         circle(handle_thickness / 2);
 `,
-    verifiable: true,
   },
   {
     id: 17,
@@ -939,7 +920,6 @@ difference() {
         rounded_square(length, width, fillet_radius);
 }
 `,
-    verifiable: true,
   },
   {
     id: 18,
@@ -1000,7 +980,6 @@ difference() {
         rounded_square(box_length, box_width, fillet_radius);
 }
 `,
-    verifiable: true,
   },
   {
     id: 19,
@@ -1055,7 +1034,6 @@ translate([saucer_diameter / 2 + pot_top_r + 12, 0, 0])
       cylinder(h = saucer_height, d = saucer_diameter - 8);
   }
 `,
-    verifiable: true,
   },
   {
     id: 20,
@@ -1103,7 +1081,6 @@ union() {
   back();
 }
 `,
-    verifiable: true,
   },
   {
     id: 21,
@@ -1147,7 +1124,6 @@ if (dividers > 0) {
   }
 }
 `,
-    verifiable: true,
   },
   {
     id: 22,
@@ -1190,7 +1166,6 @@ for (i = [0 : bar_count - 1]) {
       cylinder(h = soap_length - rim_thickness * 2, r = bar_diameter / 2, center = true);
 }
 `,
-    verifiable: true,
   },
   {
     id: 23,
@@ -1229,7 +1204,6 @@ inner_edge = [ for (t = [total : -5 : 0])
 linear_extrude(height = thickness)
   polygon(concat(outer_edge, inner_edge));
 `,
-    verifiable: true,
   },
   {
     id: 24,
@@ -1283,7 +1257,6 @@ union() {
     }
 }
 `,
-    verifiable: true,
   },
   {
     id: 25,
@@ -1325,7 +1298,6 @@ union() {
   }
 }
 `,
-    verifiable: true,
   },
   {
     id: 26,
@@ -1369,7 +1341,6 @@ difference() {
       offset(r = -wall_thickness) heart_plate();
 }
 `,
-    verifiable: true,
   },
   {
     id: 27,
@@ -1408,7 +1379,6 @@ difference() {
       cylinder(h = plate_height + 1, d = hole_diameter);
 }
 `,
-    verifiable: true,
   },
   {
     id: 28,
@@ -1469,7 +1439,6 @@ difference() {
   }
 }
 `,
-    verifiable: true,
   },
   {
     id: 29,
@@ -1533,7 +1502,6 @@ translate([0, 0, base_height + column_height + 3 + roof_height + finial_height *
   scale([1, 1, 1.4])
     sphere(d = 8, $fn = 24);
 `,
-    verifiable: true,
   },
   {
     id: 30,
@@ -1599,7 +1567,6 @@ union() {
     cylinder(h = level_height * 0.9, d1 = top_w, d2 = 4, $fn = 4);
 }
 `,
-    verifiable: true,
   },
   {
     id: 31,
@@ -1673,7 +1640,6 @@ union() {
     sphere(d = eye_diameter * 0.8, $fn = 24);
 }
 `,
-    verifiable: true,
   },
   {
     id: 32,
@@ -1740,7 +1706,6 @@ union() {
   }
 }
 `,
-    verifiable: true,
   },
   {
     id: 33,
@@ -1793,7 +1758,6 @@ module relief() {
 
 relief();
 `,
-    verifiable: true,
   },
   {
     id: 35,
@@ -1838,7 +1802,6 @@ translate([0, back_y, base_thickness - 1])
 translate([0, 0, base_thickness - 1])
   cube([stand_width, lip_thickness, lip_height + 1]);
 `,
-    verifiable: true,
   },
   {
     id: 36,
@@ -1875,7 +1838,6 @@ difference() {
     cube([gap_width, outer_r + 1, clip_width + 1]);
 }
 `,
-    verifiable: true,
   },
   {
     id: 37,
@@ -1937,7 +1899,6 @@ difference() {
         cylinder(h = plate_thickness + 2, r = screw_hole / 2, center = true);
 }
 `,
-    verifiable: true,
   },
   {
     id: 38,
@@ -1980,7 +1941,6 @@ difference() {
   }
 }
 `,
-    verifiable: true,
   },
   {
     id: 39,
@@ -2025,7 +1985,6 @@ difference() {
   }
 }
 `,
-    verifiable: true,
   },
   {
     id: 40,
@@ -2067,7 +2026,6 @@ for (i = [0 : count - 1]) {
     coaster();
 }
 `,
-    verifiable: true,
   },
   {
     id: 41,
@@ -2113,7 +2071,6 @@ for (y = [base_width * 0.15, base_width * 0.85])
       linear_extrude(height = rib_thickness, center = true)
         polygon([[-plate_thickness, 0], [rib_length, 0], [-plate_thickness, rib_height]]);
 `,
-    verifiable: true,
   },
   {
     id: 42,
@@ -2152,7 +2109,6 @@ difference() {
   }
 }
 `,
-    verifiable: true,
   },
   {
     id: 43,
@@ -2207,7 +2163,6 @@ difference() {
       cylinder(h = top_thickness + 2, d = open_w);
 }
 `,
-    verifiable: true,
   },
   {
     id: 44,
@@ -2274,7 +2229,6 @@ translate([0, 0, pot_z])
     }
   }
 `,
-    verifiable: true,
   },
   {
     id: 45,
@@ -2325,7 +2279,6 @@ difference() {
         square([plate_width - 2 * margin, plate_height - 2 * margin], center = true);
 }
 `,
-    verifiable: true,
   },
   {
     id: 46,
@@ -2380,7 +2333,6 @@ union() {
     cube([fin_thickness, slot_length, slot_height]);
 }
 `,
-    verifiable: true,
   },
   {
     id: 47,
@@ -2431,7 +2383,6 @@ for (i = [0 : pin_count - 1]) {
     cylinder(h = pin_height + 1, d = d);
 }
 `,
-    verifiable: true,
   },
   {
     id: 48,
@@ -2492,7 +2443,478 @@ union() {
     polygon(outer_pts);
 }
 `,
-    verifiable: true,
+  },
+  {
+    id: 49,
+    name: '燕尾榫拼接块',
+    category: '装配结构',
+    level: 'classic',
+    applies: '两块板/两个盒体的可拆装拼接、燕尾滑轨、无螺丝装配',
+    idea: '燕尾截面沿 Z 贯通挤出：榫头外端比根部宽，沿竖直方向滑入后就被斜面锁住；榫槽按 clearance 放大一圈，保证能滑动又不松垮',
+    points: [
+      '榫根埋进块体 1mm，union 才有实体重叠；只共面相接会产生开放边',
+      '榫槽做成沿 Z 贯通的开槽（不是盲孔），装配方向是"从上往下套进去"',
+      'clearance 取 0.2~0.4mm；FDM 上小于 0.15 基本装不进去',
+      'tenon_d / neck 用 min() 收敛到块体尺寸以内，参数拉满时不会穿出块体',
+      '这是两件套：左件带榫头、右件带榫槽，一起打印（测试里允许 2 个实体）',
+    ],
+    code: `/* [拼接块] */
+block_w = 40; // [20:5:80]
+block_d = 30; // [15:5:60]
+block_h = 20; // [10:5:40]
+
+/* [燕尾榫] */
+tenon_neck = 12; // [6:1:24]
+tenon_depth = 12; // [6:1:24]
+tenon_flare = 4; // [1:0.5:8]
+clearance = 0.3; // [0.1:0.05:0.6]
+
+/* [排布] */
+part_gap = 8; // [4:2:30]
+
+/* [Hidden] */
+$fn = 32;
+
+// 参数收敛：榫不能长过块体，也不能宽过块体
+tenon_d = min(tenon_depth, block_d - 4);
+neck = min(tenon_neck, block_w - 2 * tenon_flare - 4);
+
+// 燕尾截面（2D）：根部窄、外端宽 → 沿 Z 滑入后自锁
+module dovetail_2d(clear = 0) {
+  polygon([[-neck / 2 - clear, -1],
+           [ neck / 2 + clear, -1],
+           [ neck / 2 + tenon_flare + clear, tenon_d + clear],
+           [-neck / 2 - tenon_flare - clear, tenon_d + clear]]);
+}
+
+// 左件：块体 + 榫头
+union() {
+  cube([block_w, block_d, block_h]);
+  translate([block_w / 2, block_d, 0])
+    linear_extrude(height = block_h)
+      dovetail_2d();
+}
+
+// 右件：块体 - 榫槽（沿 Z 贯通，从上方套入）
+translate([block_w + part_gap, block_d + part_gap, 0])
+  difference() {
+    cube([block_w, block_d, block_h]);
+    translate([block_w / 2, 0, -1])
+      linear_extrude(height = block_h + 2)
+        dovetail_2d(clearance);
+  }
+`,
+  },
+  {
+    id: 50,
+    name: '卡扣式圆盖',
+    category: '盒体收纳',
+    level: 'classic',
+    applies: '圆盒/圆罐的盖子、卡扣密封盖、样品盒盖',
+    idea: '整块圆柱从底面掏空做出裙边与盖顶，再在裙边内壁 union 一圈向内凸的卡扣凸缘；凸缘靠裙边弹性越过盒口后卡住',
+    points: [
+      '先 difference 掏内腔，再 union 卡扣圈——顺序反了凸缘会被内腔一起切掉',
+      '裙边内半径 = 盒外半径 + wall_clearance，凸缘再向内凸 bead_depth',
+      '凸缘轴向位置用 min() 收敛到裙边高度以内，否则会藏进盖顶里',
+      '凸缘外半径只比裙边内半径大 0.6mm，刚好嵌进裙边壁，不要超过盖体外径',
+    ],
+    code: `/* [盒体] */
+box_outer_diameter = 60; // [30:2:120]
+wall_clearance = 0.3; // [0.15:0.05:0.6]
+
+/* [盖体] */
+lid_wall = 2.5; // [1.5:0.5:5]
+top_thickness = 3; // [2:0.5:6]
+skirt_height = 10; // [6:1:25]
+
+/* [卡扣] */
+bead_depth = 0.8; // [0.3:0.1:1.5]
+bead_height = 1.5; // [0.8:0.1:3]
+bead_lift = 2; // [1:0.5:6]
+
+/* [Hidden] */
+$fn = 96;
+
+rim_r = box_outer_diameter / 2 + wall_clearance;  // 裙边内半径
+cap_r = rim_r + lid_wall;                          // 裙边外半径
+bead_z = min(bead_lift, skirt_height - bead_height - 1);
+
+// 主体：整块圆柱，从底面掏空，只留盖顶
+difference() {
+  cylinder(h = skirt_height + top_thickness, r = cap_r);
+  translate([0, 0, -1])
+    cylinder(h = skirt_height + 1, r = rim_r);
+}
+
+// 卡扣凸缘：内壁向内凸出一圈（放在掏空之后 union，才不会被切掉）
+translate([0, 0, bead_z])
+  difference() {
+    cylinder(h = bead_height, r = rim_r + 0.6);
+    translate([0, 0, -1])
+      cylinder(h = bead_height + 2, r = rim_r - bead_depth);
+  }
+`,
+  },
+  {
+    id: 51,
+    name: '六边形壁架',
+    category: '墙面收纳',
+    level: 'advanced',
+    applies: '六边形蜂窝墙架、多肉/香薰展示架、钥匙杂物架',
+    idea: '六边形平台 + 内缩一圈的六边形边框组成托盘；后侧立一块背板，开两个"钥匙孔"（入口圆 + 上窄槽），挂在墙上的螺丝头上',
+    points: [
+      'circle($fn=6) 的第一个顶点在 0°，所以默认就有一条平边朝 -Y，背板正好贴这条边',
+      '六边形平边到中心的距离是 hex_r * cos(30°)',
+      '背板底面沉进平台 1mm 再 union，避免只有一条棱相接',
+      '钥匙孔 = 入口圆 + 向上窄槽，都沿 Y 穿透背板；槽宽必须小于螺钉头直径',
+      '边框 = 实心六棱柱减内缩六棱柱，再与平台重叠 1mm union',
+    ],
+    code: `/* [搁板] */
+hex_radius = 70; // [40:5:150]
+plate_thickness = 4; // [2.5:0.5:8]
+rim_height = 12; // [6:1:30]
+rim_wall = 3; // [2:0.5:6]
+
+/* [背板] */
+back_height = 40; // [25:5:90]
+back_thickness = 5; // [3:0.5:8]
+
+/* [钥匙孔] */
+hole_spacing = 60; // [30:5:100]
+entry_diameter = 8; // [6:0.5:12]
+slot_width = 3.6; // [2.5:0.2:6]
+slot_rise = 8; // [4:1:16]
+hole_lift = 10; // [6:2:30]
+
+/* [Hidden] */
+$fn = 96;
+
+apothem = hex_radius * cos(30);   // 平边到中心距离
+
+hole_z = plate_thickness + max(2, min(hole_lift, back_height - slot_rise - 2));
+
+module hex_prism(r, h) {
+  linear_extrude(height = h)
+    circle(r = r, $fn = 6);
+}
+
+difference() {
+  union() {
+    // 托盘底
+    hex_prism(hex_radius, plate_thickness);
+    // 边框：实心六棱柱减内缩六棱柱，底部与托盘重叠 1mm
+    translate([0, 0, plate_thickness - 1])
+      difference() {
+        hex_prism(hex_radius, rim_height + 1);
+        hex_prism(hex_radius - rim_wall, rim_height + 2);
+      }
+    // 背板：贴在 -Y 平边上，底面沉进平台 1mm
+    translate([-hex_radius * 0.5, -apothem, plate_thickness - 1])
+      cube([hex_radius, back_thickness, back_height + 1]);
+  }
+  // 钥匙孔：入口圆 + 向上窄槽，沿 Y 穿透背板
+  for (sx = [-1, 1])
+    translate([sx * hole_spacing / 2, -apothem + back_thickness / 2, hole_z]) {
+      rotate([-90, 0, 0])
+        cylinder(h = back_thickness + 4, r = entry_diameter / 2, center = true);
+      translate([-slot_width / 2, -(back_thickness + 4) / 2, 0])
+        cube([slot_width, back_thickness + 4, slot_rise]);
+    }
+}
+`,
+  },
+  {
+    id: 52,
+    name: '香薰烛台',
+    category: '装饰造型',
+    level: 'classic',
+    applies: '茶蜡烛台、香薰蜡烛杯、礼品烛座',
+    idea: '同心双筒：外筒内部掏一个更小的烛槽，槽底留料；槽壁上开一圈等高径向通气孔给火焰供氧，外壁再切竖槽做装饰',
+    points: [
+      '烛槽深度用 min() 收敛，别把底掏穿；pocket_floor 就是通气孔的高度基准',
+      '通气孔沿径向钻穿侧壁，孔的下沿要高于烛槽底面，否则会漏蜡',
+      '装饰竖槽用"加长 1mm 的立方体"切外壁，只切出凹槽、不穿透',
+      '底沿外扩 1mm 做稳定裙边，烛台不容易被碰倒',
+    ],
+    code: `/* [烛杯] */
+outer_diameter = 46; // [35:1:80]
+cup_height = 26; // [14:1:50]
+wall_thickness = 3; // [2:0.5:6]
+base_thickness = 3; // [2:0.5:8]
+
+/* [烛槽] */
+candle_diameter = 39.5; // [30:0.5:60]
+candle_depth = 18; // [8:1:40]
+
+/* [通气孔] */
+vent_count = 6; // [0:1:12]
+vent_diameter = 5; // [3:0.5:10]
+vent_lift = 4; // [2:0.5:10]
+
+/* [装饰] */
+flute_count = 12; // [0:1:24]
+flute_depth = 1; // [0.5:0.25:3]
+
+/* [Hidden] */
+$fn = 96;
+
+outer_r = outer_diameter / 2;
+pocket_d = min(candle_diameter, outer_diameter - 2 * wall_thickness - 2);
+pocket_h = min(candle_depth, cup_height - base_thickness - 2);
+pocket_floor = cup_height - pocket_h;
+
+difference() {
+  union() {
+    cylinder(h = cup_height, r = outer_r);
+    // 底沿外扩，增加稳定性
+    cylinder(h = 2.5, r = outer_r + 1);
+  }
+  // 烛槽
+  translate([0, 0, pocket_floor])
+    cylinder(h = pocket_h + 1, r = pocket_d / 2);
+  // 通气孔：径向钻穿侧壁
+  if (vent_count > 0)
+    for (i = [0 : vent_count - 1])
+      rotate([0, 0, i * 360 / vent_count])
+        translate([0, 0, pocket_floor + vent_lift])
+          rotate([0, 90, 0])
+            cylinder(h = outer_r + 4, r = vent_diameter / 2);
+  // 装饰竖槽：只在外壁凹进去，不穿透
+  if (flute_count > 0)
+    for (i = [0 : flute_count - 1])
+      rotate([0, 0, i * 360 / flute_count])
+        translate([outer_r - flute_depth, -2, -1])
+          cube([flute_depth + 2, 4, cup_height + 2]);
+}
+`,
+  },
+  {
+    id: 53,
+    name: '批头收纳座',
+    category: '实用工具',
+    level: 'basic',
+    applies: '六角/圆柄批头收纳、钻头座、螺丝刀头架',
+    idea: '圆角矩形底座上开两排盲孔：一排 $fn=6 的六角孔插六角批头，一排圆孔插圆柄；孔深小于座高，底部留料托住批头',
+    points: [
+      '六角孔直接给 cylinder 的 $fn = 6，不用手算多边形',
+      '两排各自均分：间距 = (长度 - 2×边距) / max(列数-1, 1)，列数为 1 时不除零',
+      '盲孔深度用 min() 收敛到 base_height - 2，底部至少留 2mm 料',
+      '圆角用 offset + linear_extrude，比 minkowski 快得多',
+    ],
+    code: `/* [底座] */
+base_length = 100; // [60:5:160]
+base_width = 55; // [35:5:120]
+base_height = 16; // [10:2:40]
+corner_radius = 6; // [0:1:15]
+
+/* [六角孔（6.35mm 批头）] */
+hex_cols = 8; // [2:1:16]
+hex_hole = 6.7; // [5:0.25:9]
+
+/* [圆孔（4mm 细批头）] */
+round_cols = 8; // [2:1:16]
+round_hole = 4.2; // [3:0.25:6]
+
+/* [孔深] */
+hole_depth = 11; // [4:1:30]
+margin = 6; // [3:1:15]
+
+/* [Hidden] */
+$fn = 48;
+
+hole_d = min(hole_depth, base_height - 2);
+hole_span = base_length - 2 * margin;
+hex_pitch = hole_span / max(hex_cols - 1, 1);
+round_pitch = hole_span / max(round_cols - 1, 1);
+hex_y = base_width * 0.30 - base_width / 2;
+round_y = base_width * 0.72 - base_width / 2;
+
+difference() {
+  translate([-base_length / 2, -base_width / 2, 0])
+    linear_extrude(height = base_height)
+      offset(r = corner_radius)
+        square([base_length - 2 * corner_radius, base_width - 2 * corner_radius]);
+
+  // 六角孔
+  for (i = [0 : hex_cols - 1])
+    translate([-hole_span / 2 + i * hex_pitch, hex_y, base_height - hole_d])
+      cylinder(h = hole_d + 1, r = hex_hole / 2, $fn = 6);
+
+  // 圆孔
+  for (i = [0 : round_cols - 1])
+    translate([-hole_span / 2 + i * round_pitch, round_y, base_height - hole_d])
+      cylinder(h = hole_d + 1, r = round_hole / 2);
+}
+`,
+  },
+  {
+    id: 54,
+    name: '线轴支架',
+    category: '实用工具',
+    level: 'classic',
+    applies: '3D 打印机料盘架、线轴立架、胶带/绳卷支架',
+    idea: '配重底板 + 一端立柱 + 悬臂轴：轴水平伸出并悬在底板正上方，线轴套上去后重心仍落在底板范围内',
+    points: [
+      '轴要伸到底板上方（不是伸出板外），否则装上料盘就翻倒',
+      '立柱底部沉进底板 1mm 才 union 成一体',
+      '三角加强筋：先在 X-Y 平面画三角形 linear_extrude，再 rotate([0,-90,0]) 把挤出方向转到 X、三角形立到 Y-Z 平面',
+      '轴径要小于料盘内孔（常见 50~55mm 孔，轴取 40mm 左右）',
+    ],
+    code: `/* [底板] */
+base_length = 90; // [60:5:170]
+base_depth = 90; // [60:5:170]
+base_thickness = 6; // [4:0.5:12]
+
+/* [立柱] */
+post_width = 30; // [16:1:60]
+post_thickness = 12; // [8:1:30]
+post_height = 50; // [30:2:90]
+
+/* [悬臂轴] */
+shaft_diameter = 40; // [20:1:60]
+shaft_length = 70; // [40:2:150]
+
+/* [Hidden] */
+$fn = 64;
+
+base_half = base_depth / 2;
+// 轴心高度：至少让轴底离开底板，同时尽量收在立柱高度内
+shaft_z = max(base_thickness + shaft_diameter / 2,
+              min(base_thickness + shaft_diameter / 2 + 2, base_thickness + post_height - 2));
+shaft_y0 = -base_half + post_thickness - 1;
+
+// 底板
+translate([-base_length / 2, -base_half, 0])
+  cube([base_length, base_depth, base_thickness]);
+
+// 立柱：立在 -Y 端
+translate([-post_width / 2, -base_half, base_thickness - 1])
+  cube([post_width, post_thickness, post_height + 1]);
+
+// 三角加强筋：X-Y 平面三角形挤出后转到 Y-Z 平面
+translate([post_width / 2, shaft_y0, base_thickness - 1])
+  rotate([0, -90, 0])
+    linear_extrude(height = post_width - 4)
+      polygon([[0, 0], [post_height * 0.75, 0], [0, post_height * 0.75]]);
+
+// 悬臂轴：从立柱前面伸出，末端留在底板范围内
+translate([0, shaft_y0, shaft_z])
+  rotate([-90, 0, 0])
+    cylinder(h = min(shaft_length, base_depth - post_thickness - 4), r = shaft_diameter / 2);
+`,
+  },
+  {
+    id: 55,
+    name: '便签弹簧夹',
+    category: '桌面收纳',
+    level: 'basic',
+    applies: '便签/便条夹、票据夹、名片立夹、食谱卡片夹',
+    idea: '一整块立柱从顶面往下开"上宽下窄"的楔形缝：上半段宽口引纸，下半段窄缝夹紧，缝隙底部留料当弹性铰点',
+    points: [
+      '缝分两段：上段开口宽（3mm 左右）引纸，下段窄缝（1.2~1.6mm）夹持',
+      '缝深用 min() 收敛到柱高的 75%，根部留够材料，否则一插就断',
+      '窄缝底要高于底脚顶面，否则夹子会被切成两半',
+      '缝沿 X 贯通整个柱宽，纸才能从顶部插进去',
+    ],
+    code: `/* [夹体] */
+clip_width = 30; // [20:1:60]
+clip_depth = 18; // [12:1:40]
+clip_height = 40; // [20:1:80]
+
+/* [夹口] */
+jaw_gap = 1.4; // [0.8:0.1:3]
+mouth_gap = 3.4; // [2:0.2:8]
+slot_depth = 30; // [10:1:60]
+
+/* [底脚] */
+base_thickness = 4; // [2:0.5:10]
+base_margin = 3; // [0:0.5:10]
+
+/* [Hidden] */
+$fn = 32;
+
+cut_h = min(slot_depth, clip_height * 0.75);
+mouth_h = min(cut_h * 0.45, clip_depth * 0.6);
+narrow_h = cut_h - mouth_h;
+narrow_bottom = clip_height - cut_h;
+
+difference() {
+  union() {
+    // 立柱
+    cube([clip_width, clip_depth, clip_height]);
+    // 底脚：比立柱宽一圈
+    translate([-base_margin, -base_margin, 0])
+      cube([clip_width + 2 * base_margin, clip_depth + 2 * base_margin, base_thickness]);
+  }
+  // 窄缝（夹持段）
+  translate([-1, (clip_depth - jaw_gap) / 2, narrow_bottom])
+    cube([clip_width + 2, jaw_gap, narrow_h + 1]);
+  // 宽口（引纸段）
+  translate([-1, (clip_depth - mouth_gap) / 2, clip_height - mouth_h])
+    cube([clip_width + 2, mouth_gap, mouth_h + 1]);
+}
+`,
+  },
+  {
+    id: 56,
+    name: '直角角码',
+    category: '实用工具',
+    level: 'classic',
+    applies: '层板/框架直角连接、桌面加固角码、家具补强',
+    idea: '两条互相垂直的立板在拐角重叠成一体；横腿开沉头通孔（螺丝从外侧拧入），竖腿开直通孔 + 六角螺母槽（螺母嵌入）',
+    points: [
+      '两腿在拐角共享一块 plate_thickness×plate_thickness 的方料，union 后自然成一体',
+      '沉头 = 上大下小的圆台（cylinder 的 r1 小、r2 大）+ 直通孔，锥深 head_depth',
+      '螺母槽是 $fn=6 的六棱柱，r 取"对边距 / (2·cos30°)"',
+      '沉头孔和螺母槽不要开在同一条腿上，否则螺纹件互相打架',
+    ],
+    code: `/* [角码] */
+leg_length = 60; // [35:2:150]
+bracket_width = 30; // [16:1:80]
+plate_thickness = 5; // [3:0.5:12]
+
+/* [沉头腿] */
+screw_hole = 3.4; // [2.5:0.1:6]
+head_hole = 6.4; // [4:0.2:12]
+head_depth = 2.2; // [1:0.2:5]
+screw_count = 2; // [1:1:4]
+
+/* [螺母槽腿] */
+nut_depth = 3; // [2:0.2:6]
+nut_across = 5.6; // [4:0.1:12]
+
+/* [Hidden] */
+$fn = 48;
+
+nut_r = nut_across / (2 * cos(30));  // 对边距 → 六棱柱外接半径
+
+difference() {
+  union() {
+    // 竖腿（贴 -Y 面）
+    cube([bracket_width, plate_thickness, leg_length]);
+    // 横腿（贴底面）
+    cube([bracket_width, leg_length, plate_thickness]);
+  }
+
+  for (i = [0 : screw_count - 1]) {
+    p = leg_length * (i + 1) / (screw_count + 1);
+
+    // 横腿：顶部沉头 + 贯穿孔
+    translate([bracket_width / 2, p, plate_thickness - head_depth])
+      cylinder(h = head_depth + 1, r1 = screw_hole / 2, r2 = head_hole / 2);
+    translate([bracket_width / 2, p, -1])
+      cylinder(h = plate_thickness + 2, r = screw_hole / 2);
+
+    // 竖腿：贯穿孔 + 内侧六角螺母槽
+    translate([bracket_width / 2, -1, p])
+      rotate([-90, 0, 0])
+        cylinder(h = plate_thickness + 2, r = screw_hole / 2);
+    translate([bracket_width / 2, plate_thickness - nut_depth, p])
+      rotate([-90, 0, 0])
+        cylinder(h = nut_depth + 1, r = nut_r, $fn = 6);
+  }
+}
+`,
   },
 ];
 
@@ -2517,17 +2939,15 @@ export function getExample(id: number): ModelingExample | undefined {
  */
 export function examplesToPromptText(): string {
   const header = `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-四、建模范例库（${EXAMPLES.length} 个完整可运行范例）
+五、建模范例库（${EXAMPLES.length} 个完整可运行范例）
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 每种器物都有完整可运行范例。理解范例的建模思路，然后根据用户需求
 套用最接近的范例，改参数和剖面即可。不要凭空发明建模方法。
 
-范例 11~33 全部使用本地求值器支持的原语（circle/square/polygon、
-cube/cylinder/sphere、translate/rotate/scale/mirror、offset、
-linear_extrude、rotate_extrude、for/if），生成这类代码可被自动验证。
-范例 4 的 minkowski、范例 7 的 text、范例 10 的 hull 本地不支持，
-套用它们时验证会跳过——能用等价的 offset/范例 11~33 方案时优先用后者。`;
+所有范例都已用真实 OpenSCAD WASM 引擎（Manifold 后端）编译通过，并通过
+结构审计（单连通体、无开放边、贴床）。minkowski、text、hull 都可用，
+按需要选型即可。`;
 
   const blocks = EXAMPLES.map((e) => {
     const idLabel = e.id === 3.5 ? '3b' : String(e.id);

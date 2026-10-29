@@ -69,8 +69,8 @@ export const RULES: readonly KnowledgeRule[] = [
     id: 'S05',
     layer: 'structure',
     title: '尺寸合理：整体最小边 ≥ 0.5mm，最大边 ≤ 2000mm',
-    check: '网格 bbox 三边范围',
-    bad: '壁厚参数被写成 0.05，或单位误用导致 20000mm 的"花瓶"',
+    check: '网格 bbox 三边范围；单件最长边还要 ≤ 热床（常见 220~256mm），超出必须拆件并在 design_plan 声明',
+    bad: '壁厚参数被写成 0.05，或单位误用导致 20000mm 的"花瓶"；420mm 的分隔条一次打不下',
     fix: '检查参数单位与默认值，薄片改成实体',
     autoDetect: true,
   },
@@ -276,7 +276,7 @@ export function rulesToPromptText(rules: readonly KnowledgeRule[] = RULES): stri
 
   return [
     '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-    '七、结构与可打印性硬约束（生成后逐条核对，违反即返工）',
+    '八、结构与可打印性硬约束（生成后逐条核对，违反即返工）',
     '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
     '',
     '【结构类】未标「·自检」的由引擎与网格分析自动判定，不通过会被打回',

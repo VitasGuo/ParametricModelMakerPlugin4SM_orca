@@ -32,7 +32,7 @@ Every model is compiled for real by OpenSCAD WASM inside the browser (not by an 
 - **真实引擎验证 / Real-engine verification**：每次生成都用 OpenSCAD WASM 编译；语法错误、空模型、尺寸异常会被打回重试。<br>Every generation is compiled with OpenSCAD WASM; syntax errors, empty models, and abnormal dimensions are rejected and retried.
 - **参数面板 / Parameter panel**：按 Customizer 注释自动生成滑杆、枚举、开关、颜色控件，参数通过 `-D` 覆盖，不改写源码。<br>Sliders, enums, checkboxes, and color controls are generated from Customizer annotations; parameters are applied via `-D` overrides without rewriting the source.
 - **3D 预览 / 3D preview**：Three.js Z-up 视图，等轴、正、顶、右视角、线框、截图。<br>Three.js Z-up viewer with iso / front / top / right views, wireframe, and screenshots.
-- **范例库 / Example library**：48 个完整可运行范例，覆盖容器、盒体、园艺、数学曲线、建筑、艺术与实用工具，支持搜索、分类、复制、一键载入。<br>48 fully working examples covering containers, boxes, gardening, mathematical curves, architecture, art, and practical tools, with search, categories, copy, and one-click loading.
+- **范例库 / Example library**：56 个完整可运行范例，覆盖容器、盒体、收纳、装配配合、壁挂、园艺、数学曲线、建筑、艺术与实用工具，支持搜索、分类、复制、一键载入，全部经真实引擎编译与结构审计。<br>56 fully working examples covering containers, boxes, storage, joints and fits, wall mounting, gardening, mathematical curves, architecture, art, and practical tools — searchable, categorized, copyable, and loadable in one click; every one is compiled and mesh-audited by the real engine.
 - **批量变体 / Batch variants**：一次生成多组参数，并排编译、缩略图预览、单组应用、全部导出 STL。<br>Generate multiple parameter sets at once, compiled side by side with thumbnail previews; apply one set or export all of them as STL.
 - **形状审核 / Shape review**：主模型支持图片输入时（SenseNova 6.8、GLM-4V、GPT-4o、Claude、Gemini 等），自动把 ISO / FRONT / TOP 三视图发给它判断形状；纯文本模型退化为网格摘要加设计计划。<br>When the main model accepts images (SenseNova 6.8, GLM-4V, GPT-4o, Claude, Gemini, etc.), ISO / FRONT / TOP views are sent for shape checking; text-only models fall back to a mesh summary plus a design plan.
 - **导出 / Export**：STL、3MF、`.scad`（含当前参数值）、项目 JSON。<br>STL, 3MF, `.scad` (with current parameter values baked in), and project JSON.
@@ -128,7 +128,7 @@ npm run dev          # 独立网页开发 / standalone web dev server
 npm run build        # 生产构建 / production build
 npm run preview      # 预览构建产物 / preview the build output
 npm run typecheck    # tsc --noEmit
-npm test             # 单测 + 48 个范例真实引擎编译冒烟 / unit tests + real-engine smoke compile of all 48 examples
+npm test             # 单测 + 56 个范例真实引擎编译冒烟 / unit tests + real-engine smoke compile of all 56 examples
 ```
 
 不修改 Program Files 的插件验证方式 / Verifying the plugin without touching Program Files:
@@ -155,7 +155,7 @@ npm run orca:proxy
 ParametricModelMakerPlugin4SM_orca/
 ├── src/
 │   ├── core/                 # types / scad-parser / lint / prompts / examples / logger
-│   ├── knowledge/            # 带编号的硬约束规则表（结构 / 可打印性）/ numbered hard-constraint rules
+│   ├── knowledge/            # 知识库：workflow.ts（工作流程章）+ rules.ts（带编号的硬约束）/ knowledge base: workflow chapter + numbered hard-constraint rules
 │   ├── engine/
 │   │   ├── openscad.worker.ts  # WASM 编译 Worker（一次性实例）/ WASM compile worker (one-shot instance)
 │   │   ├── compiler.ts         # 主线程编译 API（超时 / 并发）/ main-thread compile API (timeout / concurrency)
