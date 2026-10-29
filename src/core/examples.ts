@@ -3679,6 +3679,21 @@ union() {
 /** 全部分类（按首个出现顺序）。 */
 export const EXAMPLE_CATEGORIES: string[] = [...new Set(EXAMPLES.map((e) => e.category))];
 
+/**
+ * system prompt 里附完整源码的范例。
+ *
+ * 选取标准：模板复用率高、技巧不可替代，且每个大类至少保留 1 个。
+ * 其余范例在 prompt 里只保留「名称 + 适用 + 思路」的目录条目——模型知道
+ * 这类东西有解、知道思路，但不必把 66 份源码全文塞进上下文。
+ * 源码仍然完整地留在 UI 范例库，用户一键即可载入。
+ */
+export const PROMPT_FULL_IDS: readonly number[] = [
+  1, 2, 3, 3.5, 6, 7, 9, 10, 11, 16, 17, 20, 22, 30,
+  37, 41, 49, 51, 54, 57, 58, 59, 60, 62, 63, 64,
+];
+
+const PROMPT_FULL = new Set(PROMPT_FULL_IDS);
+
 /** 按难度层级名（UI 显示用）。 */
 export const LEVEL_LABELS: Record<ExampleLevel, string> = {
   basic: '简单',
@@ -3692,16 +3707,18 @@ export function getExample(id: number): ModelingExample | undefined {
 }
 
 /**
- * 生成拼进 system prompt 的范例文本（保持既有排版：编号 + 标题 + 适用 + 思路 + 关键点 + 代码）。
+ * 生成拼进 system prompt 的范例文本。
+ *  - PROMPT_FULL_IDS 里的：编号 + 标题 + 适用 + 思路 + 关键点 + 完整源码
+ *  - 其余：编号 + 标题 + 适用 + 思路（目录条目，不给源码）
  * id 为 3.5 的肾形范例在 prompt 里显示为"范例 3b"。
  */
 export function examplesToPromptText(): string {
   const header = `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-五、建模范例库（${EXAMPLES.length} 个完整可运行范例）
+五、建模范例库（${EXAMPLES.length} 个：${PROMPT_FULL_IDS.length} 个附源码，其余为目录）
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-每种器物都有完整可运行范例。理解范例的建模思路，然后根据用户需求
-套用最接近的范例，改参数和剖面即可。不要凭空发明建模方法。
+每种器物都有成熟做法。附源码的范例要照着改；只列目录的范例知道思路后自己实现，
+必要时组合附源码范例的手法。不要凭空发明建模方法。
 
 所有范例都已用真实 OpenSCAD WASM 引擎（Manifold 后端）编译通过，并通过
 结构审计（无开放边、贴床；多件拆解图按件数核对）。minkowski、text、hull 都可用，
@@ -3709,6 +3726,11 @@ export function examplesToPromptText(): string {
 
   const blocks = EXAMPLES.map((e) => {
     const idLabel = e.id === 3.5 ? '3b' : String(e.id);
+    if (!PROMPT_FULL.has(e.id)) {
+      return `范例 ${idLabel}：${e.name}（${e.category}·${LEVEL_LABELS[e.level]}）｜目录
+适用：${e.applies}
+思路：${e.idea}`;
+    }
     const points = e.points.map((p) => `  - ${p}`).join('\n');
     return `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 范例 ${idLabel}：${e.name}（${e.category}·${LEVEL_LABELS[e.level]}）

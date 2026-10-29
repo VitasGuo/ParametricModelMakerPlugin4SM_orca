@@ -10,6 +10,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { buildSystemPrompt, buildUserContext, parseAiOutput, OUTPUT_SCHEMA } from '../src/core/prompts.js';
+import { EXAMPLES, PROMPT_FULL_IDS, examplesToPromptText, getExample } from '../src/core/examples.js';
 import type { EditorState } from '../src/core/types.js';
 
 const SCAD = `/* [Box] */
@@ -45,6 +46,36 @@ describe('buildSystemPrompt', () => {
 
   it('要求 replaceSource 时用 Customizer 注释', () => {
     expect(buildSystemPrompt()).toContain('/* [Group] */');
+  });
+
+  it('体积受控：范例分两级注入，整体不超过 80k 字符', () => {
+    const p = buildSystemPrompt();
+    expect(p.length).toBeLessThan(80_000);
+    expect(p).toContain(`${EXAMPLES.length} 个：${PROMPT_FULL_IDS.length} 个附源码`);
+  });
+});
+
+describe('范例 prompt 分级', () => {
+  const text = examplesToPromptText();
+
+  it('每个范例都有条目（附源码或目录），模型知道库里有它', () => {
+    for (const e of EXAMPLES) {
+      const label = e.id === 3.5 ? '3b' : String(e.id);
+      expect(text, `ex${label}`).toContain(`范例 ${label}：`);
+    }
+    const briefCount = EXAMPLES.filter((e) => !PROMPT_FULL_IDS.includes(e.id)).length;
+    expect(text.match(/｜目录/g)?.length ?? 0).toBe(briefCount);
+  });
+
+  it('附源码的编号都存在，数量在合理区间', () => {
+    for (const id of PROMPT_FULL_IDS) expect(getExample(id), `id ${id}`).toBeDefined();
+    expect(PROMPT_FULL_IDS.length).toBeGreaterThanOrEqual(20);
+    expect(PROMPT_FULL_IDS.length).toBeLessThanOrEqual(32);
+  });
+
+  it('目录条目不带代码，只有附源码条目带 openscad 代码块', () => {
+    const codeBlocks = text.match(/```openscad/g)?.length ?? 0;
+    expect(codeBlocks).toBe(PROMPT_FULL_IDS.length);
   });
 });
 
