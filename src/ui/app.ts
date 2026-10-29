@@ -34,6 +34,7 @@ import { openExamplesModal } from './examples.js';
 import { openProjectsModal } from './projects.js';
 import { openBatchModal } from './batch.js';
 import { openHistoryModal } from './history.js';
+import { openImageImportModal } from './image-import.js';
 import { openLogsModal } from './logs.js';
 import { openAboutModal } from './about.js';
 import { toast } from './toast.js';
@@ -85,6 +86,7 @@ export class App {
       buildMenu('文件', [
         { label: '新建项目', action: () => this.newProject() },
         { label: '打开…', action: () => this.openProjects() },
+        { label: '从图片生成像素画…', action: () => this.openImageImport() },
         { label: '保存项目', action: () => this.saveCurrent() },
         { label: '保存当前版本到历史', action: () => this.snapshotCurrent() },
         { label: '历史版本…', action: () => this.openHistory() },
@@ -117,6 +119,7 @@ export class App {
       menuBar,
       el('div', 'topbar-actions', [
         button('保存', 'btn btn-sm', () => this.saveCurrent()),
+        button('历史', 'btn btn-sm btn-ghost', () => this.openHistory()),
         button('导出', 'btn btn-sm btn-ghost', () => this.exportStl()),
       ]),
       el('div', 'topbar-center', [this.projectName]),
@@ -608,6 +611,22 @@ export class App {
     } else {
       toast('当前代码已在历史中');
     }
+  }
+
+  private openImageImport(): void {
+    openImageImportModal((scad, note) => {
+      this.store.replaceSource(scad);
+      const snapshot = pushHistory({
+        source: scad,
+        paramValues: this.store.state.project.paramValues,
+        action: 'image',
+        name: note,
+        note: '由图片降采样生成',
+      });
+      if (snapshot) logger.info('history', `自动保存图片像素画「${snapshot.name}」`);
+      this.store.addChat({ role: 'system', text: `已从图片生成像素画：${note}` });
+      toast('已生成像素画源码');
+    });
   }
 
   private openHistory(): void {

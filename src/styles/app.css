@@ -1324,6 +1324,45 @@ button {
   margin-top: 8px;
 }
 
+/* 历史条目里点开才渲染的源码块 */
+.history-code {
+  margin: 8px 0 0;
+  max-height: 280px;
+  overflow: auto;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.55;
+  white-space: pre;
+  tab-size: 2;
+}
+
+/* 图片导入弹窗 */
+.pixel-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pixel-preview-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 6px 0;
+}
+
+.pixel-preview {
+  max-width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  image-rendering: pixelated;
+}
+
 @media (max-width: 1180px) {
   .main {
     grid-template-columns: 300px minmax(0, 1fr) 260px;

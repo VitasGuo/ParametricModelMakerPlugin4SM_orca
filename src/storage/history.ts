@@ -6,7 +6,7 @@
 
 import type { ParamValues } from '../engine/types.js';
 
-export type HistoryAction = 'ai' | 'example' | 'manual' | 'project';
+export type HistoryAction = 'ai' | 'example' | 'manual' | 'project' | 'image';
 
 export interface HistoryEntry {
   id: string;

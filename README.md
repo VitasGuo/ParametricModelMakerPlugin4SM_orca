@@ -32,15 +32,16 @@ Every model is compiled for real by OpenSCAD WASM inside the browser (not by an 
 - **真实引擎验证 / Real-engine verification**：每次生成都用 OpenSCAD WASM 编译；语法错误、空模型、尺寸异常会被打回重试。<br>Every generation is compiled with OpenSCAD WASM; syntax errors, empty models, and abnormal dimensions are rejected and retried.
 - **参数面板 / Parameter panel**：按 Customizer 注释自动生成滑杆、枚举、开关、颜色控件，参数通过 `-D` 覆盖，不改写源码。<br>Sliders, enums, checkboxes, and color controls are generated from Customizer annotations; parameters are applied via `-D` overrides without rewriting the source.
 - **3D 预览 / 3D preview**：Three.js Z-up 视图，等轴、正、顶、右视角、线框、截图。<br>Three.js Z-up viewer with iso / front / top / right views, wireframe, and screenshots.
-- **范例库 / Example library**：56 个完整可运行范例，覆盖容器、盒体、收纳、装配配合、壁挂、园艺、数学曲线、建筑、艺术与实用工具，支持搜索、分类、复制、一键载入，全部经真实引擎编译与结构审计。<br>56 fully working examples covering containers, boxes, storage, joints and fits, wall mounting, gardening, mathematical curves, architecture, art, and practical tools — searchable, categorized, copyable, and loadable in one click; every one is compiled and mesh-audited by the real engine.
+- **范例库 / Example library**：61 个完整可运行范例，覆盖容器、盒体、收纳、装配配合、壁挂磁吸、园艺、数学曲线、建筑、像素图案、艺术与实用工具，支持搜索、分类、复制、一键载入，全部经真实引擎编译与结构审计。<br>61 fully working examples covering containers, boxes, storage, joints and fits, wall mounting and magnets, gardening, mathematical curves, architecture, pixel art, art, and practical tools — searchable, categorized, copyable, and loadable in one click; every one is compiled and mesh-audited by the real engine.
+- **图片转像素画 / Image to pixel art**：选一张图，浏览器内降采样成像素网格，自动生成 OpenSCAD 源码（分层浮雕或拼豆空心珠），像素数据编码进字符串常量，不依赖任何外部文件。<br>Pick an image and it is downsampled to a pixel grid in the browser, then turned into OpenSCAD source (layered relief or hollow beads); the pixel data is encoded as a string constant, so no external files are needed.
 - **批量变体 / Batch variants**：一次生成多组参数，并排编译、缩略图预览、单组应用、全部导出 STL。<br>Generate multiple parameter sets at once, compiled side by side with thumbnail previews; apply one set or export all of them as STL.
 - **形状审核 / Shape review**：主模型支持图片输入时（SenseNova 6.8、GLM-4V、GPT-4o、Claude、Gemini 等），自动把 ISO / FRONT / TOP 三视图发给它判断形状；纯文本模型退化为网格摘要加设计计划。<br>When the main model accepts images (SenseNova 6.8, GLM-4V, GPT-4o, Claude, Gemini, etc.), ISO / FRONT / TOP views are sent for shape checking; text-only models fall back to a mesh summary plus a design plan.
 - **导出 / Export**：STL、3MF、`.scad`（含当前参数值）、项目 JSON。<br>STL, 3MF, `.scad` (with current parameter values baked in), and project JSON.
 - **中英双语 / Bilingual UI**：顶栏一键切换，保留当前项目与编译状态。<br>One-click language switching from the top bar, keeping the current project and compile state.
 - **本地 AI 代理 / Local AI proxy**：内置 Node 中继（`127.0.0.1:17329`），解决 SenseNova、GLM、OpenAI 的浏览器 CORS 限制。<br>A built-in Node relay (`127.0.0.1:17329`) that works around the browser CORS limits of SenseNova, GLM, and OpenAI.
-- **macOS 风格顶栏 / macOS-style top bar**：左侧菜单（文件 / 视图 / 帮助）加明确的「保存 / 导出」按钮，项目名居中，右侧状态。<br>Left menus (File / View / Help) plus explicit Save / Export buttons, a centered project name, and status on the right.
+- **macOS 风格顶栏 / macOS-style top bar**：左侧菜单（文件 / 视图 / 帮助）加「保存 / 历史 / 导出」三个按钮，项目名居中，右侧状态。<br>Left menus (File / View / Help) plus Save / History / Export buttons, a centered project name, and status on the right.
 - **中心视图切换 / Center view switching**：3D 预览与 SCAD 源代码只在中部区域切换，左右聊天、参数面板保持可见；编辑器占满中间高度。<br>The 3D preview and SCAD source switch only in the center area, keeping the chat and parameter panels visible; the editor fills the center height.
-- **历史版本 / History**：AI 生成、载入范例、保存项目时自动命名并快照源码，可随时载入、导出、删除。<br>AI generations, example loads, and project saves are auto-named and snapshotted; restore, export, or delete them at any time.
+- **历史版本 / History**：AI 生成、载入范例、图片导入、保存项目时自动命名并快照源码；顶栏「历史」按钮随时打开，每条可直接展开查看源码，也可载入、导出或删除。<br>AI generations, example loads, image imports, and project saves are auto-named and snapshotted; the top-bar History button opens the list anytime, where each entry can be expanded to read its source, restored, exported, or deleted.
 - **运行日志 / Logs**：编译、AI 调用、导出、设置等事件写入本机环形日志，可在「帮助 → 运行日志」查看、复制、导出。<br>Compile, AI, export, and settings events are written to a local ring buffer, viewable, copyable, and exportable via "Help → Logs".
 - **版本、作者、仓库 / Version, author, repo**：底部状态栏显示版本、开发者、许可证与 GitHub 链接，帮助菜单可查看关于信息。<br>The bottom status bar shows version, developer, license, and the GitHub link; the Help menu has an About dialog.
 - **纯静态 + BYOK**：无后端，API Key 明文保存在本机浏览器 localStorage（风险自负）。<br>No backend; the API key is stored in plain text in the browser's localStorage on your machine (at your own risk).
@@ -128,7 +129,7 @@ npm run dev          # 独立网页开发 / standalone web dev server
 npm run build        # 生产构建 / production build
 npm run preview      # 预览构建产物 / preview the build output
 npm run typecheck    # tsc --noEmit
-npm test             # 单测 + 56 个范例真实引擎编译冒烟 / unit tests + real-engine smoke compile of all 56 examples
+npm test             # 单测 + 61 个范例真实引擎编译冒烟 / unit tests + real-engine smoke compile of all 61 examples
 ```
 
 不修改 Program Files 的插件验证方式 / Verifying the plugin without touching Program Files:
@@ -155,6 +156,7 @@ npm run orca:proxy
 ParametricModelMakerPlugin4SM_orca/
 ├── src/
 │   ├── core/                 # types / scad-parser / lint / prompts / examples / logger
+│   ├── tools/                # image-grid.ts：图片 → 像素网格 → SCAD / image → pixel grid → SCAD
 │   ├── knowledge/            # 知识库：environment.ts（运行环境硬限制）+ workflow.ts（工作流程）+ rules.ts（编号硬约束）/ knowledge base: runtime limits, workflow, numbered rules
 │   ├── engine/
 │   │   ├── openscad.worker.ts  # WASM 编译 Worker（一次性实例）/ WASM compile worker (one-shot instance)

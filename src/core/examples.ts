@@ -3125,6 +3125,137 @@ difference() {
 }
 `,
   },
+  {
+    id: 60,
+    name: '像素画 / 拼豆板',
+    category: '像素与图案',
+    level: 'classic',
+    applies: '图片转像素画、拼豆底板、头像浮雕、logo 摆件、儿童拼板',
+    idea: '像素数据塞进一个字符串常量，SCAD 端用 [for (c = pixels) ord(c) - 48] 还原成数字数组；每格按等级拉成方块（浮雕）或摆一颗空心珠（拼豆）',
+    points: [
+      '字符串是塞一堆数据的轻量写法：每格一个字符，16×16 只有 256 字节',
+      'OpenSCAD 没有字符串下标，但可以直接迭代字符串，for (c = pixels) 逐个拿到 1 字符',
+      'ord(c) 取字符编码，减 48 就是 0~9 的数字；0 = 空白，1~3 = 逐级变高',
+      '底座用 offset + linear_extrude 做圆角，所有像素块下沉 0.5mm 与底座相交',
+      '拼豆珠 = 圆柱减通孔，孔只在该珠自己的 difference 里切，不会伤到底板',
+      '格子按 0.84 倍收缩留缝，像素之间才有分隔感；改 cell 就能整体缩放',
+    ],
+    code: `/* [画板] */
+cell = 6; // [3:0.5:12]
+base_thickness = 2.4; // [1.2:0.2:8]
+corner_radius = 3; // [0:0.5:12]
+
+/* [样式] */
+style = 0; // [0: 分层浮雕, 1: 拼豆空心珠]
+layer_height = 1.2; // [0.4:0.2:4]
+bead_height = 4; // [2:0.5:8]
+
+/* [Hidden] */
+$fn = 32;
+
+// 像素数据：16×16，每格一个字符。0=空白，1~2=逐级变高（拼豆模式下 >0 就是一颗）
+cols = 16;
+rows = 16;
+pixels = str(
+  "0000000000000000",  // 第 1 行
+  "0000000000000000",
+  "0011100000111000",
+  "0122210001222100",
+  "1222221122222210",
+  "1222222222222221",
+  "1222222222222221",
+  "0122222222222210",
+  "0012222222222100",
+  "0001222222221000",
+  "0000122222210000",
+  "0000012222100000",
+  "0000001221000000",
+  "0000000110000000",
+  "0000000000000000",
+  "0000000000000000"
+);
+
+data = [for (c = pixels) ord(c) - 48];
+function px(i, j) = let (k = j * cols + i) (k >= 0 && k < len(data)) ? data[k] : 0;
+
+board_w = cols * cell;
+board_d = rows * cell;
+
+union() {
+  // 底板
+  linear_extrude(height = base_thickness)
+    offset(r = corner_radius)
+      square([board_w - 2 * corner_radius, board_d - 2 * corner_radius], center = true);
+
+  // 像素块 / 拼豆珠
+  for (i = [0 : cols - 1])
+    for (j = [0 : rows - 1]) {
+      v = px(i, j);
+      if (v > 0) {
+        x = -board_w / 2 + (i + 0.5) * cell;
+        y = board_d / 2 - (j + 0.5) * cell;
+        translate([x, y, base_thickness - 0.5]) {
+          if (style == 0) {
+            translate([-cell * 0.42, -cell * 0.42, 0])
+              cube([cell * 0.84, cell * 0.84, v * layer_height + 0.5]);
+          } else {
+            difference() {
+              cylinder(h = bead_height + 0.5, r = cell * 0.42);
+              translate([0, 0, -0.5])
+                cylinder(h = bead_height + 2, r = cell * 0.17);
+            }
+          }
+        }
+      }
+    }
+}
+`,
+  },
+  {
+    id: 61,
+    name: '磁吸收纳条',
+    category: '墙面收纳',
+    level: 'basic',
+    applies: '冰箱贴条、工具磁条、洞洞板磁吸底座、厨房刀架背条',
+    idea: '一根圆角长条，背后等距开一排圆磁铁沉孔；打印时正面朝下、孔朝上，不用桥接，磁铁用胶固定后整条吸在金属面上',
+    points: [
+      '磁铁孔是盲孔：深度 = 磁铁厚 + 0.2，直径 = 磁铁径 + 0.2（过盈靠胶补）',
+      '孔朝上打印：把正面放在热床上，孔是竖直的，不会出现桥接',
+      '孔之间至少留 2mm 筋，否则相邻孔壁被掏空，条子一掰就断',
+      '孔从背面往下切，孔底留 1.5mm 以上的料，不能把条子打穿',
+      '磁铁极性会互相排斥，装之前先按同一面吸一遍再点胶',
+    ],
+    code: `/* [条体] */
+bar_length = 200; // [80:10:300]
+bar_width = 20; // [12:1:60]
+bar_thickness = 8; // [5:0.5:20]
+edge_radius = 3; // [0:0.5:8]
+
+/* [磁铁] */
+magnet_diameter = 8; // [3:0.5:20]
+magnet_depth = 3; // [1:0.2:8]
+magnet_count = 5; // [2:1:12]
+
+/* [Hidden] */
+$fn = 48;
+
+magnet_d = magnet_diameter + 0.2;              // 过盈靠胶补
+pocket_d = min(magnet_depth + 0.2, bar_thickness - 1.5);
+pitch = bar_length / (magnet_count + 1);
+
+difference() {
+  // 条体：圆角矩形，正面（z=0）贴床打印
+  linear_extrude(height = bar_thickness)
+    offset(r = edge_radius)
+      square([bar_length - 2 * edge_radius, bar_width - 2 * edge_radius], center = true);
+
+  // 背面磁铁沉孔
+  for (i = [0 : magnet_count - 1])
+    translate([-bar_length / 2 + pitch * (i + 1), 0, bar_thickness - pocket_d])
+      cylinder(h = pocket_d + 1, r = magnet_d / 2, $fn = 36);
+}
+`,
+  },
 ];
 
 /** 全部分类（按首个出现顺序）。 */

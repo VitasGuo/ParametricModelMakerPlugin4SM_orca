@@ -17,6 +17,7 @@ const ACTION_LABELS: Record<HistoryAction, string> = {
   example: '范例',
   manual: '手动保存',
   project: '项目快照',
+  image: '图片导入',
 };
 
 export function openHistoryModal(onRestore: (source: string, values: ParamValues) => void): void {
@@ -56,7 +57,7 @@ export function openHistoryModal(onRestore: (source: string, values: ParamValues
   function renderCard(entry: HistoryEntry): HTMLElement {
     const time = new Date(entry.createdAt).toLocaleString('zh-CN', { hour12: false });
     const chars = `${entry.source.length} 字符`;
-    return el('div', 'history-card', [
+    const card = el('div', 'history-card', [
       el('div', 'history-head', [
         el('strong', '', [entry.name]),
         el('span', 'history-badge', [ACTION_LABELS[entry.action]]),
@@ -64,12 +65,31 @@ export function openHistoryModal(onRestore: (source: string, values: ParamValues
       ]),
       entry.note ? el('div', 'history-note', [entry.note]) : null,
       el('div', 'history-meta', [chars]),
+    ]);
+
+    // 代码默认收起，点开才创建节点——历史条目可能有几十条，全部预渲染太占内存
+    let codeBox: HTMLElement | null = null;
+    const toggleCode = button('查看代码', 'btn btn-sm btn-ghost', () => {
+      if (!codeBox) {
+        codeBox = el('pre', 'history-code');
+        codeBox.textContent = entry.source;
+        card.appendChild(codeBox);
+        toggleCode.textContent = '收起代码';
+        return;
+      }
+      const hidden = codeBox.style.display === 'none';
+      codeBox.style.display = hidden ? '' : 'none';
+      toggleCode.textContent = hidden ? '收起代码' : '查看代码';
+    });
+
+    card.appendChild(
       el('div', 'history-actions', [
         button('载入', 'btn btn-sm btn-accent', () => {
           onRestore(entry.source, entry.paramValues);
           dialog.close();
           toast(`已载入「${entry.name}」`);
         }),
+        toggleCode,
         button('导出 .scad', 'btn btn-sm btn-ghost', () => {
           downloadBlob(new Blob([entry.source], { type: 'text/plain' }), `${safeName(entry.name)}.scad`);
           toast('SCAD 已开始下载');
@@ -78,7 +98,8 @@ export function openHistoryModal(onRestore: (source: string, values: ParamValues
           deleteHistory(entry.id);
           render();
         }),
-      ]),
-    ]);
+      ])
+    );
+    return card;
   }
 }
