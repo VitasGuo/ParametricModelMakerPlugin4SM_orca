@@ -1,6 +1,6 @@
 {
   "name": "parametric-model-maker-plugin4sm-orca",
-  "version": "0.4.2",
+  "version": "0.5.0",
   "description": "AI parametric model maker for Snapmaker Orca: standalone OpenSCAD workbench + one-click sidebar plugin.",
   "private": true,
   "type": "module",

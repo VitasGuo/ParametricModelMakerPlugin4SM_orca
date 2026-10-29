@@ -9,6 +9,10 @@
 import type { AiAction, EditorState, ScadCustomization } from './types.js';
 import { parseCustomizer } from './scad-parser.js';
 import { examplesToPromptText } from './examples.js';
+import { rulesToPromptText } from '../knowledge/rules.js';
+
+/** 结构与可打印性规则，渲染成自检清单注入。 */
+const RULE_TEXT = rulesToPromptText();
 
 /** 约束 AI 输出的 JSON schema 描述（自然语言说明，给模型看）。 */
 export const OUTPUT_SCHEMA = `{
@@ -23,7 +27,7 @@ export const OUTPUT_SCHEMA = `{
     // replaceSource 时
     "scad": "<完整 .scad 源码，必须含 /* [Group] */ Customizer 注释>",
     "design_plan": "<必填。三部分：①套用哪个范例；②关键几何量演算（各原语圆心/半径/交点坐标的实际数值）；③预期轮廓的文字描述（如'一侧弧形凹陷的豆形'）>",
-    "self_check": { "<检查项名>": "<结论 + 数值依据>" },  // 必填，至少含 4 项：开口性(内壁口部是否与外壁同高)、壁厚(<最小半径)、剖面X≥0(rotate_extrude)、参数范围(default∈[min,max])
+    "self_check": { "<规则编号或检查项>": "<结论 + 数值依据>" },  // 必填：结构类 S01~S06 逐条给结论（引擎会复核），工艺类至少挑 3 条适用的 P 规则给数值结论
     // explain 时
     "text": "<给用户看的中文解释>",
     // batchVariants 时
@@ -503,6 +507,8 @@ ${MODELING_EXAMPLES}
 ${DECISION_TREE}
 
 ${COMMON_ERRORS}
+
+${RULE_TEXT}
 
 【如何选择 action type】
 根据用户意图和当前项目状态自行判断：
