@@ -2916,6 +2916,215 @@ difference() {
 }
 `,
   },
+  {
+    id: 57,
+    name: '螺旋桨（扭转挤出叶片）',
+    category: '机械零件',
+    level: 'advanced',
+    applies: '螺旋桨、风扇叶片、涡轮叶片、船桨、流线型翼片',
+    idea: '叶片就是一条"两端全圆的翼型截面"沿展向 linear_extrude：twist 让它边伸边扭转，scale 让它边伸边收窄；再 rotate 把桨距立起来，2~5 片绕桨毂阵列',
+    points: [
+      '截面 = hull(两个圆)，圆半径 = 半个厚度，两圆间距 = 弦长 - 厚度 → 得到两头全圆的翼型',
+      'twist 是沿挤出轴的总扭转角；slices 要 ≥ 40，否则扭曲面会拉成折面',
+      '挤出方向默认 +Z，用 rotate([0,90,0]) 把展向转到 +X；再 rotate([root_pitch,0,0]) 立起桨距',
+      'scale 是等比缩放：桨尖弦长和厚度一起收，想单独收厚度就改截面圆半径',
+      '桨根埋进桨毂 2mm；桨毂半径要 ≥ 桨根弦长的一半，否则根部会露在外面',
+      '别用 hull 逐段链式放样：叶片本体干净，但和桨毂 union 后接缝处会随机冒出 8~40 条非流形边（实测）',
+    ],
+    code: `/* [桨毂] */
+hub_diameter = 20; // [12:1:40]
+hub_height = 14; // [8:1:30]
+shaft_bore = 5.2; // [0:0.2:12]
+
+/* [桨叶] */
+blade_count = 2; // [2:1:5]
+blade_length = 70; // [30:5:120]
+root_chord = 12; // [6:0.5:24]
+root_thickness = 3.2; // [1.5:0.2:6]
+tip_scale = 0.5; // [0.25:0.05:1]
+
+/* [扭转] */
+root_pitch = 30; // [0:5:60]
+twist_angle = 25; // [-60:5:60]
+slices = 40; // [20:1:120]
+
+/* [Hidden] */
+$fn = 48;
+profile_fn = 24;
+
+hub_r = hub_diameter / 2;
+blade_z = hub_height / 2;
+root_d = hub_r - 2;              // 桨根埋进桨毂 2mm
+pr = root_thickness / 2;         // 截面圆半径 = 半厚
+
+module blade_profile() {
+  hull() {
+    translate([0, root_chord / 2 - pr]) circle(r = pr, $fn = profile_fn);
+    translate([0, -root_chord / 2 + pr]) circle(r = pr, $fn = profile_fn);
+  }
+}
+
+module blade() {
+  rotate([root_pitch, 0, 0])
+    rotate([0, 90, 0])
+      linear_extrude(height = blade_length, twist = twist_angle, slices = slices, scale = tip_scale)
+        blade_profile();
+}
+
+difference() {
+  union() {
+    cylinder(h = hub_height, r = hub_r);
+    for (k = [0 : blade_count - 1])
+      rotate([0, 0, k * 360 / blade_count])
+        translate([root_d, 0, blade_z])
+          blade();
+  }
+  translate([0, 0, -1])
+    cylinder(h = hub_height + 2, r = shaft_bore / 2);
+}
+`,
+  },
+  {
+    id: 58,
+    name: '体素地形摆件（hash 噪声）',
+    category: '体素造型',
+    level: 'classic',
+    applies: '我的世界风地形、像素方块摆件、随机山脉装饰、体素地形沙盘',
+    idea: '用 fract(sin(n)·43758.5) 自己造伪随机，再做值噪声 + 平滑插值得到高度场；每个格子拉一根方块柱，柱高离散成层级，就是方块地形',
+    points: [
+      'OpenSCAD 没有 random()，标准做法是 hash(n) = fract(sin(n + seed) * 43758.5453)',
+      '值噪声 = 四角 hash 双线性插值，插值前用 smoothstep 让过渡不生硬',
+      '一个格子只生成一根柱（不是每层一个方块），实体数 = 格数，不会爆',
+      '整片规则网格可以严格相邻：Manifold 会把共面合并掉，实测 100 根柱 = 0 开放边',
+      '但别给方块加 0.01 这种"贴容差"的微小缩放，角上会留下退化的 0.01×0.01 重叠，实测冒出 14 条开放边',
+      '所有柱子下沉 0.5mm 插进底座，保证是一整块',
+    ],
+    code: `/* [地形] */
+grid_size = 10; // [6:1:16]
+block = 6; // [3:0.5:10]
+max_levels = 5; // [2:1:10]
+
+/* [噪声] */
+seed = 12345; // [1:1:99999]
+noise_scale = 0.18; // [0.05:0.01:0.6]
+octave2 = 0.45; // [0:0.05:1]
+
+/* [底座] */
+base_thickness = 2; // [1:0.5:6]
+base_margin = 3; // [0:1:8]
+
+/* [Hidden] */
+$fn = 24;
+
+world = grid_size * block;
+half = world / 2;
+
+function hash(n) = let (v = sin(n * 12.9898 + seed) * 43758.5453) v - floor(v);
+function smooth(t) = t * t * (3 - 2 * t);
+function mix(a, b, t) = a + (b - a) * t;
+
+function vnoise(x, y) =
+  let (i = floor(x), j = floor(y), fx = smooth(x - i), fy = smooth(y - j))
+  let (a = hash(i + j * 57), b = hash(i + 1 + j * 57),
+       c = hash(i + (j + 1) * 57), d = hash(i + 1 + (j + 1) * 57))
+  mix(mix(a, b, fx), mix(c, d, fx), fy);
+
+function height_at(x, y) =
+  let (v = (vnoise(x * noise_scale, y * noise_scale)
+          + vnoise(x * noise_scale * 2, y * noise_scale * 2) * octave2) / (1 + octave2))
+  min(max_levels, max(1, floor(v * max_levels) + 1));
+
+translate([-half, -half, 0]) {
+  // 底座：比地形大一圈
+  translate([-base_margin, -base_margin, 0])
+    cube([world + 2 * base_margin, world + 2 * base_margin, base_thickness]);
+
+  // 方块柱：每格一根，下沉 0.5mm 与底座相交
+  for (i = [0 : grid_size - 1])
+    for (j = [0 : grid_size - 1]) {
+      h = height_at(i, j);
+      translate([i * block, j * block, base_thickness - 0.5])
+        cube([block, block, h * block + 0.5]);
+    }
+}
+`,
+  },
+  {
+    id: 59,
+    name: '蜂窝穿孔减重板',
+    category: '机械零件',
+    level: 'classic',
+    applies: '蜂窝镂空装饰板、散热格栅、减重盖板、透气墙板',
+    idea: '圆角矩形板做外形，用 intersection 把"内缩边框区"和"蜂窝阵列"取交集，得到的蜂窝再一次性减掉——边框完整、内部是规整的六边形网格',
+    points: [
+      'circle(r, $fn=6) 得到的就是正六边形，不用手算顶点',
+      '蜂窝排布：列距 1.5r，行距 1.732r，奇数列再偏移半个行距',
+      '孔半径乘系数 k = 1 + web/(2r) 放大间距，六边形之间才留出筋',
+      '用 intersection(内缩区, 蜂窝) 再差集，边框自然保留，不会切到外轮廓',
+      '安装孔放在边框正中；边框宽度要 ≥ 孔径 + 2.4，否则孔边只剩一层皮',
+    ],
+    code: `/* [面板] */
+panel_width = 120; // [40:5:200]
+panel_depth = 80; // [30:5:150]
+panel_thickness = 4; // [2:0.5:10]
+corner_radius = 8; // [0:1:20]
+border = 8; // [3:1:20]
+
+/* [蜂窝] */
+hole_radius = 6; // [3:0.5:14]
+web = 1.2; // [0.8:0.1:4]
+
+/* [安装孔] */
+mount_holes = true;
+mount_hole = 4.2; // [0:0.2:8]
+
+/* [Hidden] */
+$fn = 36;
+
+r = hole_radius;
+k = 1 + web / (2 * r);                 // 间距放大，留出筋
+dx = 1.5 * r * k;
+dy = 1.732 * r * k;
+cols = max(1, floor((panel_width - 2 * border) / dx) + 1);
+rows = max(1, floor((panel_depth - 2 * border) / dy) + 1);
+mount_r = min(mount_hole / 2, border / 2 - 1.2);
+mount_x = panel_width / 2 - border / 2;
+mount_y = panel_depth / 2 - border / 2;
+
+module panel_2d() {
+  offset(r = corner_radius)
+    square([panel_width - 2 * corner_radius, panel_depth - 2 * corner_radius], center = true);
+}
+
+module hexes_2d() {
+  start_x = -(cols - 1) * dx / 2;
+  start_y = -(rows - 1) * dy / 2;
+  for (i = [0 : cols - 1])
+    for (j = [0 : rows - 1])
+      translate([start_x + i * dx, start_y + j * dy + (i % 2) * dy / 2 - dy / 4])
+        circle(r = r, $fn = 6);
+}
+
+difference() {
+  linear_extrude(height = panel_thickness)
+    panel_2d();
+
+  // 蜂窝孔只挖在边框以内
+  translate([0, 0, -1])
+    linear_extrude(height = panel_thickness + 2)
+      intersection() {
+        offset(r = -border) panel_2d();
+        hexes_2d();
+      }
+
+  // 四角安装孔
+  if (mount_holes && mount_r > 0.5)
+    for (sx = [-1, 1], sy = [-1, 1])
+      translate([sx * mount_x, sy * mount_y, -1])
+        cylinder(h = panel_thickness + 2, r = mount_r);
+}
+`,
+  },
 ];
 
 /** 全部分类（按首个出现顺序）。 */
