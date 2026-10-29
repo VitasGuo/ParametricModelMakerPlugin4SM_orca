@@ -155,7 +155,7 @@ npm run orca:proxy
 ParametricModelMakerPlugin4SM_orca/
 ├── src/
 │   ├── core/                 # types / scad-parser / lint / prompts / examples / logger
-│   ├── knowledge/            # 知识库：workflow.ts（工作流程章）+ rules.ts（带编号的硬约束）/ knowledge base: workflow chapter + numbered hard-constraint rules
+│   ├── knowledge/            # 知识库：environment.ts（运行环境硬限制）+ workflow.ts（工作流程）+ rules.ts（编号硬约束）/ knowledge base: runtime limits, workflow, numbered rules
 │   ├── engine/
 │   │   ├── openscad.worker.ts  # WASM 编译 Worker（一次性实例）/ WASM compile worker (one-shot instance)
 │   │   ├── compiler.ts         # 主线程编译 API（超时 / 并发）/ main-thread compile API (timeout / concurrency)

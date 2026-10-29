@@ -43,8 +43,8 @@ export const RULES: readonly KnowledgeRule[] = [
     layer: 'structure',
     title: '闭合曲面：不能有开放边（破面）',
     check: '网格中每条边恰好被 2 个三角形共享，开放边数 = 0',
-    bad: 'difference 的被减体与被减空间共面，或壳体厚度为 0，留下开口缝',
-    fix: '让布尔运算的实体错开 0.2mm 避免共面；确保每个壳都有厚度',
+    bad: 'difference 的被减体与被减空间共面；壳体厚度为 0；体素方块只"边对边/角对角"接触（实测 2 个对角相邻的立方体 = 1 条开放边）',
+    fix: '布尔实体错开 0.2mm 避免共面；每个壳都要有厚度；方块阵列统一收缩 0.01mm 互相重叠',
     autoDetect: true,
   },
   {

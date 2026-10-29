@@ -11,6 +11,7 @@ import { parseCustomizer } from './scad-parser.js';
 import { examplesToPromptText } from './examples.js';
 import { rulesToPromptText } from '../knowledge/rules.js';
 import { WORKFLOW } from '../knowledge/workflow.js';
+import { ENVIRONMENT } from '../knowledge/environment.js';
 
 /** 结构与可打印性规则，渲染成自检清单注入。 */
 const RULE_TEXT = rulesToPromptText();
@@ -540,6 +541,20 @@ const COMMON_ERRORS = `
 
 33. 沥水条间隙 > 被承托物最小尺寸 → 香皂/杯子漏下去
    正确：间隙取 5~8mm，条径 4~6mm，先算条数 = floor(内宽/(条径+间隙))
+
+【运行环境类错误】（详见第零章，出现即返工）
+34. 写了 include <BOSL2/std.scad> 或 include <MCAD/...> → 只有 warning，不报错，
+    随后所有库函数变 unknown module，模型静默塌成空壳
+   正确：一个 include 都不写，用知识库里的原生等价写法
+
+35. 把中文/日文/韩文塞进 text() → 实测渲染成 □ 豆腐块且不报错
+   正确：用拉丁字母或几何图形；用户确认传过字体（如 SimHei）才写 font="SimHei"
+
+36. 用 minkowski 做 3D 圆角 → 实测单个圆角立方体编译 338 秒，必超时
+   正确：2D 圆角用 offset + linear_extrude，3D 圆角用 hull
+
+37. 体素/方块阵列让方块"边对边、角对角"接触 → 产生非流形开放边
+   正确：每个方块按 0.01mm 收缩、互相穿插，再 union
 `;
 
 /** 统一 system prompt：完整知识库。 */
@@ -548,6 +563,8 @@ export function buildSystemPrompt(): string {
 你只能输出严格 JSON，不要任何 markdown 代码块、不要解释 JSON 之外的文字。
 JSON 结构必须严格符合：
 ${OUTPUT_SCHEMA}
+
+${ENVIRONMENT}
 
 ${WORKFLOW}
 
