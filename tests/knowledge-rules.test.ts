@@ -31,10 +31,12 @@ describe('知识库规则', () => {
     expect(RULES.filter((r) => r.layer === 'structure' && r.autoDetect).length).toBeGreaterThan(0);
   });
 
-  it('渲染结果包含全部编号与两个分节', () => {
+  it('渲染结果包含全部编号与两个分节，并声明设计意图优先', () => {
     const text = rulesToPromptText();
     for (const rule of RULES) expect(text, rule.id).toContain(rule.id);
     expect(text).toContain('【结构类】');
-    expect(text).toContain('【工艺类】');
+    expect(text).toContain('【工艺类·参考】');
+    expect(text).toContain('判定顺序');
+    expect(text).toContain('工艺项只是加分项');
   });
 });

@@ -3256,6 +3256,424 @@ difference() {
 }
 `,
   },
+  // ─────────────────────────────────────────────────────────────
+  // 复杂结构（机构 / 工程结构 / 装配体）：展示"结构可以做到多完整"
+  // ─────────────────────────────────────────────────────────────
+  {
+    id: 62,
+    name: '行星齿轮组',
+    category: '机械传动',
+    level: 'advanced',
+    applies: '行星减速器教学模型、齿轮传动演示件、机器人关节减速箱外观件',
+    idea: '太阳轮居中、行星轮绕它公转、内齿圈包在最外——三者齿数必须满足 ring = sun + 2×planet 才能同轴啮合；整套按拆解图平铺在热床上，一件一套',
+    points: [
+      '齿数约束是硬条件：内齿数 = 太阳齿数 + 2×行星齿数，改了任意一个另外两个必须跟着改',
+      '中心距 = 模数 × (z1 + z2) / 2；太阳-行星啮合的中心距必须等于 (z_sun + z_planet) × 模数 / 2',
+      '齿形用梯形近似：齿顶半角 0.16×齿距角、齿根半角 0.30，比理论渐开线简单但轮廓干净',
+      '齿根比齿顶高（1.15 模数 vs 0.9 模数），留出齿顶间隙，啮合时不会顶死',
+      '内齿圈用"外圆 - 中心孔 - 反齿槽"三步做，齿槽是开向圆心的梯形',
+      '这是拆解件：内齿圈、太阳轮、若干行星轮分列摆开，不互相接触',
+    ],
+    code: `/* [齿轮组] */
+module_size = 2.4; // [1.2:0.1:5]
+sun_teeth = 12; // [8:1:24]
+planet_teeth = 9; // [6:1:18]
+planet_count = 3; // [2,3,4,5]
+gear_thickness = 8; // [4:1:20]
+ring_rim = 7; // [4:1:16]
+
+/* [拆解排布] */
+part_gap = 12; // [6:2:40]
+
+/* [Hidden] */
+$fn = 48;
+
+addendum = 0.9 * module_size;
+dedendum = 1.15 * module_size;
+ring_teeth = sun_teeth + 2 * planet_teeth;   // 同轴啮合的必要条件
+
+function pol(r, a) = [r * cos(a), r * sin(a)];
+
+// 外齿轮：轮毂圆柱 + 一圈梯形齿
+module spur_gear(teeth) {
+  pitch_r = module_size * teeth / 2;
+  r_tip = pitch_r + addendum;
+  r_root = pitch_r - dedendum;
+  pa = 360 / teeth;
+  tooth = [pol(r_root - 1, -pa * 0.30), pol(r_tip, -pa * 0.16),
+           pol(r_tip, pa * 0.16), pol(r_root - 1, pa * 0.30)];
+  union() {
+    cylinder(h = gear_thickness, r = r_root + 0.5);
+    for (i = [0 : teeth - 1])
+      rotate([0, 0, i * pa])
+        linear_extrude(height = gear_thickness)
+          polygon(points = tooth);
+  }
+}
+
+// 内齿圈：外缘圆柱 - 中心孔 - 朝内的反齿槽
+module ring_gear() {
+  pitch_r = module_size * ring_teeth / 2;
+  r_tip = pitch_r - addendum;          // 内齿齿顶（朝圆心）
+  r_root = pitch_r + dedendum;         // 齿槽底
+  pa = 360 / ring_teeth;
+  gap = [pol(r_tip - 2, -pa * 0.30), pol(r_root + 0.6, -pa * 0.24),
+         pol(r_root + 0.6, pa * 0.24), pol(r_tip - 2, pa * 0.30)];
+  difference() {
+    cylinder(h = gear_thickness, r = r_root + ring_rim);
+    translate([0, 0, -1])
+      cylinder(h = gear_thickness + 2, r = r_tip + 0.4);
+    for (i = [0 : ring_teeth - 1])
+      rotate([0, 0, (i + 0.5) * pa])
+        translate([0, 0, -1])
+          linear_extrude(height = gear_thickness + 2)
+            polygon(points = gap);
+  }
+}
+
+ring_od = 2 * (module_size * ring_teeth / 2 + dedendum + ring_rim);
+sun_od = 2 * (module_size * sun_teeth / 2 + addendum);
+planet_od = 2 * (module_size * planet_teeth / 2 + addendum);
+
+// 拆解图：内齿圈 / 太阳轮 / 一列行星轮
+translate([ring_od / 2, 0, 0]) ring_gear();
+translate([ring_od + part_gap + sun_od / 2, 0, 0]) spur_gear(sun_teeth);
+for (i = [0 : planet_count - 1])
+  translate([ring_od + part_gap + sun_od + part_gap + planet_od / 2,
+             (i - (planet_count - 1) / 2) * (planet_od + part_gap), 0])
+    spur_gear(planet_teeth);
+`,
+  },
+  {
+    id: 63,
+    name: '桁架桥摆件',
+    category: '工程结构',
+    level: 'advanced',
+    applies: '桥梁模型、桌面景观、结构教学件、可按跨度/高度/节间数自由缩放',
+    idea: '桥面 + 两侧 Warren 桁架：上下弦各一根通长梁，竖杆按节间均分，斜杆左右交替成锯齿；全部用同一个 beam 模块按两点坐标生成，改节间数整桥自动重排',
+    points: [
+      '所有杆件都是同一个 beam 模块：输入两端点 [x, z]，内部算长度和倾角再旋转',
+      '杆件截面统一 member×member，端点埋进弦杆 1 个截面深度，union 后没有共面接触',
+      '斜杆按 i % 2 交替方向，形成连续的 W 形，受力路径完整',
+      '上弦之间加横向连系杆，桥面横跨两侧下弦——三者共同把两片桁架连成一个整体',
+      '栏杆高度参数设 0 可以去掉扶手，整桥仍是单一连通体',
+    ],
+    code: `/* [桥体] */
+span = 200; // [80:10:300]
+bridge_width = 60; // [30:5:120]
+truss_height = 42; // [20:5:90]
+panels = 8; // [4:1:14]
+
+/* [构件截面] */
+member = 4; // [2:0.5:10]
+deck_t = 6; // [3:1:12]
+rail_height = 14; // [0:5:40]
+
+/* [Hidden] */
+$fn = 24;
+
+panel_len = span / panels;
+truss_y = bridge_width / 2 - member / 2;
+
+// 在 XZ 平面里放一根从 p1 到 p2 的方梁（p = [x, z]）
+module beam_xz(p1, p2) {
+  dx = p2[0] - p1[0];
+  dz = p2[1] - p1[1];
+  len = norm([dx, dz]);
+  ang = atan2(dz, dx);
+  translate([p1[0], 0, p1[1]])
+    rotate([0, -ang, 0])
+      translate([0, -member / 2, -member / 2])
+        cube([len, member, member]);
+}
+
+module side_truss() {
+  // 下弦 / 上弦
+  cube([span, member, member]);
+  translate([0, 0, truss_height - member]) cube([span, member, member]);
+  // 竖杆
+  for (i = [1 : panels - 1])
+    translate([i * panel_len - member / 2, 0, 0])
+      cube([member, member, truss_height]);
+  // 斜杆：左右交替
+  for (i = [0 : panels - 1]) {
+    x0 = i * panel_len;
+    x1 = (i + 1) * panel_len;
+    if (i % 2 == 0)
+      beam_xz([x0, member], [x1, truss_height - member]);
+    else
+      beam_xz([x0, truss_height - member], [x1, member]);
+  }
+}
+
+union() {
+  // 桥面
+  cube([span, bridge_width, deck_t]);
+  // 两侧桁架（下弦埋进桥面）
+  translate([0, truss_y, 0]) side_truss();
+  translate([0, -truss_y, 0]) side_truss();
+  // 上弦横向连系杆
+  for (i = [1 : panels - 1])
+    translate([i * panel_len - member / 2, -truss_y, truss_height - member])
+      cube([member, 2 * truss_y, member]);
+  // 栏杆
+  if (rail_height > 0) {
+    for (y = [-truss_y, truss_y]) {
+      translate([0, y - member / 2, truss_height])
+        cube([span, member, member]);
+      for (i = [0 : panels])
+        translate([i * panel_len - member / 2, y - member / 2, truss_height - member])
+          cube([member, member, rail_height + member]);
+    }
+  }
+}
+`,
+  },
+  {
+    id: 64,
+    name: '螺旋楼梯',
+    category: '工程结构',
+    level: 'advanced',
+    applies: '建筑模型、桌摆、灯座底盘、可按层高/转角/踏步数缩放的旋转结构',
+    idea: '中心柱承担全部连接，扇形踏步绕柱逐级旋转抬升，踏步内弧伸进柱子 1mm；外圈立柱从踏板表面长出来，顶端用 beam3d 方梁连成螺旋扶手',
+    points: [
+      '扇形踏步用内弧+外弧两段折线拼成 polygon，段数 8 已足够顺滑，再多只是浪费三角面',
+      '每级踏步比节距宽 6%（overlap），投影上互相咬合，视觉连续但不会真的相交',
+      '踏步起始角 = i × 总转角/踏步数；高度 = i × 单级升高，两者共用同一个 i，改踏步数时旋转和抬升同步变化',
+      '任意两点之间的梁用 beam3d：先算偏航角绕 Z，再算俯仰角绕 Y，最后放一根方梁',
+      '栏杆立柱下沉 1mm 埋进踏板，避免底面与踏板顶面共面',
+      '中心柱、底座、踏步、栏杆全部并进同一个 union，整体是一个连通体',
+    ],
+    code: `/* [楼梯] */
+step_count = 14; // [6:1:24]
+total_turn = 300; // [90:15:360]
+step_rise = 16; // [8:1:30]
+column_radius = 9; // [5:1:20]
+outer_radius = 55; // [30:5:120]
+step_thickness = 8; // [4:1:16]
+
+/* [栏杆] */
+baluster_height = 45; // [0:5:90]
+rail_size = 3.2; // [2:0.2:6]
+
+/* [底座] */
+base_radius = 34; // [20:2:90]
+
+/* [Hidden] */
+$fn = 36;
+
+sweep = total_turn / step_count;
+overlap = 1.06;
+r_in = column_radius - 1;
+rail_r = outer_radius - 4;
+
+function pol(r, a) = [r * cos(a), r * sin(a)];
+function step_top(i) = i * step_rise + step_thickness;
+function baluster_pos(i) =
+  [rail_r * cos(i * sweep), rail_r * sin(i * sweep), step_top(i) - 1];
+function rail_point(i) =
+  let (p = baluster_pos(i)) [p[0], p[1], p[2] + baluster_height];
+
+// 扇形踏步截面
+module tread_2d(a0, a1) {
+  seg = 8;
+  outer = [for (k = [0 : seg]) pol(outer_radius, a0 + (a1 - a0) * k / seg)];
+  inner = [for (k = [0 : seg]) pol(r_in, a1 - (a1 - a0) * k / seg)];
+  polygon(points = concat(outer, inner));
+}
+
+module step(i) {
+  translate([0, 0, i * step_rise])
+    rotate([0, 0, i * sweep])
+      linear_extrude(height = step_thickness)
+        tread_2d(-sweep * overlap / 2, sweep * overlap / 2);
+}
+
+// 任意两点之间的方梁
+module beam3d(p1, p2, w) {
+  d = [p2[0] - p1[0], p2[1] - p1[1], p2[2] - p1[2]];
+  yaw = atan2(d[1], d[0]);
+  pitch = atan2(d[2], sqrt(d[0] * d[0] + d[1] * d[1]));
+  translate(p1)
+    rotate([0, 0, yaw])
+      rotate([0, -pitch, 0])
+        translate([0, -w / 2, -w / 2])
+          cube([norm(d), w, w]);
+}
+
+union() {
+  // 底座 + 中心柱
+  cylinder(h = 8, r = base_radius);
+  cylinder(h = (step_count - 1) * step_rise + step_thickness + 12, r = column_radius);
+  // 踏步
+  for (i = [0 : step_count - 1]) step(i);
+  // 立柱 + 螺旋扶手
+  if (baluster_height > 0) {
+    for (i = [0 : step_count - 1])
+      translate(baluster_pos(i))
+        cylinder(h = baluster_height + 1, r = 1.8);
+    for (i = [0 : step_count - 2])
+      beam3d(rail_point(i), rail_point(i + 1), rail_size);
+  }
+}
+`,
+  },
+  {
+    id: 65,
+    name: 'DNA 双螺旋摆件',
+    category: '科学造型',
+    level: 'classic',
+    applies: '科学摆件、桌面装饰、教学模型、可调圈数/高度/直径的螺旋结构',
+    idea: '两条相位差 180° 的螺旋链：沿螺旋线按等角度步进摆放互相重叠的球，球链自动连成实体；每隔几级加一根横档穿过两条链，底部圆盘把所有链端收进同一底座',
+    points: [
+      '球心间距必须小于两倍球半径才会互相重叠成链：半径、圈数、每圈步数三者要联立检查',
+      '两条链用同一个角度加 180°，天然保持对径',
+      '横档是一根绕 Z 旋转的圆柱：rotate([0,90,0]) 让圆柱躺平，再按当前相位转正，一次穿过两条链',
+      '横档位置用 round(k × 总步数 / (档数-1)) 均匀抽样，档数变化不会跑位',
+      '底座半径要覆盖住螺旋半径 + 球半径，首节点下沉到基座内 1mm，避免点接触',
+      '全部球、横档、底座并进一个 union，整体是单一连通体',
+    ],
+    code: `/* [螺旋] */
+turns = 2.5; // [1:0.5:6]
+height = 150; // [60:10:300]
+helix_radius = 26; // [12:2:60]
+node_radius = 4.2; // [1.5:0.2:8]
+steps_per_turn = 24; // [12:2:48]
+
+/* [横档] */
+rung_count = 12; // [0:1:40]
+rung_radius = 1.6; // [0.8:0.2:4]
+
+/* [底座] */
+base_radius = 40; // [20:2:90]
+base_height = 6; // [3:1:20]
+
+/* [Hidden] */
+$fn = 20;
+
+total_steps = max(2, round(turns * steps_per_turn));
+dz = (height - base_height) / total_steps;
+
+function z_of(i) = base_height - 1 + i * dz;
+function node(i, side) =
+  let (a = i * 360 / steps_per_turn + side * 180)
+  [helix_radius * cos(a), helix_radius * sin(a), z_of(i)];
+
+union() {
+  // 底座
+  cylinder(h = base_height, r = base_radius);
+  // 两条螺旋链
+  for (i = [0 : total_steps]) {
+    translate(node(i, 0)) sphere(r = node_radius);
+    translate(node(i, 1)) sphere(r = node_radius);
+  }
+  // 横档
+  for (k = [0 : max(0, rung_count - 1)]) {
+    i = rung_count > 1 ? round(k * total_steps / (rung_count - 1)) : 0;
+    translate([0, 0, z_of(i)])
+      rotate([0, 0, i * 360 / steps_per_turn])
+        rotate([0, 90, 0])
+          cylinder(h = 2 * helix_radius, r = rung_radius, center = true);
+  }
+}
+`,
+  },
+  {
+    id: 66,
+    name: '平面关节机械臂',
+    category: '机械装配',
+    level: 'advanced',
+    applies: '桌面摆件、关节机构演示、机器人入门教具、可摆姿势的平面连杆',
+    idea: '底座、大臂、小臂、夹爪四块板全部平躺打印，用三根销轴串起来；每条臂两端各一个销孔，孔比销大 0.4mm，装好后可以摆姿势、能反复拆装',
+    points: [
+      '臂身是两端圆的胶囊形：hull() 两个圆柱，比手写多边形更省事且轮廓光滑',
+      '销孔直径 = 销径 + 2×clearance，默认 0.4 间隙；过盈会装不进去，间隙太大又会晃',
+      '销轴 = 光杆 + 端帽，光杆长度按"穿过几层板"算：两层臂 = 2×臂厚 + 4',
+      '夹爪用胶囊底板减一条开口槽，右侧留两根 9mm 宽的指；槽从端面切进去，不要做成盲槽',
+      '所有零件平铺在热床上，销轴单独排一行；这是一套装配件，不是单体',
+      '装配顺序：底座→大臂→小臂→夹爪，每层之间垫平垫圈可减少摩擦',
+    ],
+    code: `/* [臂尺寸] */
+link1 = 110; // [60:5:200]
+link2 = 80; // [40:5:150]
+arm_width = 24; // [12:2:50]
+arm_thickness = 12; // [8:1:30]
+joint_d = 8; // [4:0.5:16]
+clearance = 0.4; // [0.2:0.05:1]
+
+/* [底座与夹爪] */
+base_d = 70; // [40:5:120]
+base_thickness = 8; // [5:1:20]
+claw_length = 50; // [30:5:90]
+
+/* [排布] */
+part_gap = 14; // [8:2:40]
+
+/* [Hidden] */
+$fn = 40;
+
+hole_d = joint_d + 2 * clearance;
+pin_len = 2 * arm_thickness + 4;
+
+module link(len) {
+  difference() {
+    hull() {
+      translate([-len / 2, 0, 0]) cylinder(h = arm_thickness, r = arm_width / 2);
+      translate([ len / 2, 0, 0]) cylinder(h = arm_thickness, r = arm_width / 2);
+    }
+    for (x = [-len / 2, len / 2])
+      translate([x, 0, -1])
+        cylinder(h = arm_thickness + 2, r = hole_d / 2);
+  }
+}
+
+module base() {
+  difference() {
+    cylinder(h = base_thickness, r = base_d / 2);
+    translate([0, 0, -1])
+      cylinder(h = base_thickness + 2, r = hole_d / 2);
+  }
+}
+
+module claw() {
+  difference() {
+    hull() {
+      translate([-claw_length / 2, 0, 0]) cylinder(h = arm_thickness, r = arm_width / 2);
+      translate([ claw_length / 2, 0, 0]) cylinder(h = arm_thickness, r = arm_width / 2);
+    }
+    // 根部关节孔
+    translate([-claw_length / 2, 0, -1])
+      cylinder(h = arm_thickness + 2, r = hole_d / 2);
+    // 开口槽：从右端切进去，留两根夹指
+    translate([claw_length / 2 - 12, -3, -1])
+      cube([26, 6, arm_thickness + 2]);
+  }
+}
+
+module pin() {
+  union() {
+    cylinder(h = pin_len, r = joint_d / 2);
+    translate([0, 0, pin_len - 2])
+      cylinder(h = 2, r = joint_d / 2 + 3);
+  }
+}
+
+// 平铺：底座 / 大臂 / 小臂 / 夹爪 / 三根销
+x0 = 0;
+x1 = base_d / 2 + part_gap + link1 / 2;
+x2 = x1 + link1 / 2 + part_gap + link2 / 2;
+x3 = x2 + link2 / 2 + part_gap + claw_length / 2;
+
+union() {
+  translate([x0, 0, 0]) base();
+  translate([x1, 0, 0]) link(link1);
+  translate([x2, 0, 0]) link(link2);
+  translate([x3, 0, 0]) claw();
+  for (i = [0 : 2])
+    translate([x1 - 20 + i * 22, -base_d / 2 - 25, 0]) pin();
+}
+`,
+  },
 ];
 
 /** 全部分类（按首个出现顺序）。 */
@@ -3286,8 +3704,8 @@ export function examplesToPromptText(): string {
 套用最接近的范例，改参数和剖面即可。不要凭空发明建模方法。
 
 所有范例都已用真实 OpenSCAD WASM 引擎（Manifold 后端）编译通过，并通过
-结构审计（单连通体、无开放边、贴床）。minkowski、text、hull 都可用，
-按需要选型即可。`;
+结构审计（无开放边、贴床；多件拆解图按件数核对）。minkowski、text、hull 都可用，
+按需要选型即可。范例只是起点：复杂件可以组合多个范例、拆成多件、写到六七百行。`;
 
   const blocks = EXAMPLES.map((e) => {
     const idLabel = e.id === 3.5 ? '3b' : String(e.id);
