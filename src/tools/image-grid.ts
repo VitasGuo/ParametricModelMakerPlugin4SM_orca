@@ -127,13 +127,13 @@ difference() {
         if (v > 0) {
           x = -board_w / 2 + (i + 0.5) * cell;
           y = board_d / 2 - (j + 0.5) * cell;
-          translate([x, y, base_thickness - 0.5]) {
+          translate([x, y, base_thickness - 1]) {
             if (style == 0) {
               translate([-cell * 0.42, -cell * 0.42, 0])
-                cube([cell * 0.84, cell * 0.84, v * layer_height + 0.5]);
+                cube([cell * 0.84, cell * 0.84, v * layer_height + 1]);
             } else {
               difference() {
-                cylinder(h = bead_height + 0.5, r = cell * 0.42);
+                cylinder(h = bead_height + 1, r = cell * 0.42);
                 translate([0, 0, -0.5])
                   cylinder(h = bead_height + 2, r = cell * 0.17);
               }

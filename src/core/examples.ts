@@ -219,16 +219,19 @@ module crescent_2d(r_out, r_in, off) {
   }
 }
 
+// 外轮廓：先做圆角，内腔再从这个"已圆角"的轮廓整体内缩
+module outline() {
+  offset(r = fillet_radius) crescent_2d(outer_r, inner_r, offset_x);
+}
+
 module box_outer() {
-  linear_extrude(height = height)
-    offset(r = fillet_radius) crescent_2d(outer_r, inner_r, offset_x);
+  linear_extrude(height = height) outline();
 }
 
 module box_inner() {
   translate([0, 0, bottom_thickness])
     linear_extrude(height = height - bottom_thickness + 0.1)
-      offset(r = fillet_radius - wall_thickness)
-        offset(r = -wall_thickness) crescent_2d(outer_r, inner_r, offset_x);
+      offset(r = -wall_thickness) outline();
 }
 
 // length 用 X 向缩放实现：外形长宽 = length × width（默认 120 × 80）
@@ -280,16 +283,19 @@ module kidney_2d(r_out, r_in, off_x) {
   }
 }
 
+// 外轮廓先圆角；内腔从同一轮廓整体内缩，凹陷处才不会把壁挖穿
+module outline() {
+  offset(r = fillet_radius) kidney_2d(outer_r, indent_r, indent_offset_x);
+}
+
 module box_outer() {
-  linear_extrude(height = height)
-    offset(r = fillet_radius) kidney_2d(outer_r, indent_r, indent_offset_x);
+  linear_extrude(height = height) outline();
 }
 
 module box_inner() {
   translate([0, 0, bottom_thickness])
     linear_extrude(height = height - bottom_thickness + 0.1)
-      offset(r = fillet_radius - wall_thickness)
-        offset(r = -wall_thickness) kidney_2d(outer_r, indent_r, indent_offset_x);
+      offset(r = -wall_thickness) outline();
 }
 
 difference() {
@@ -300,14 +306,16 @@ difference() {
   },
   {
     id: 4,
-    name: '方盒（minkowski 圆角）',
+    name: '方盒（直角厚壁）',
     category: '盒体收纳',
     level: 'basic',
-    applies: '方盒、收纳箱、抽屉、外壳、支架（圆角需求不敏感时可用范例 17 替代）',
-    idea: '外立方体 - 内立方体，内立方体向上偏移留底厚',
+    applies: '方盒、收纳箱、抽屉、外壳、支架；要圆角就直接用范例 17',
+    idea: '外立方体减去内腔立方体：内腔从底厚之上开始、四周留墙、向上多挖 0.1 保证开顶',
     points: [
-      'minkowski + cylinder 做圆角（会增大尺寸，需预先减去）',
-      '内腔向上偏移 bottom_thickness',
+      '内腔 = 外形 - 2×wall，墙厚参数用 min() 夹住，极端取值不会把侧壁挖穿',
+      '内腔只从 z = bottom_thickness 起，底部是实心板，不会成漏斗',
+      '内腔顶面多挖 0.1mm，保证开口处不留一层薄膜',
+      '要做圆角别用 minkowski（会膨胀尺寸、拐角壁厚变薄），改用范例 17 的 offset 方案',
     ],
     code: `/* [主体尺寸] */
 length = 100; // [40:5:200]
@@ -316,19 +324,17 @@ height = 50; // [20:5:100]
 wall_thickness = 2.5; // [1:0.5:6]
 bottom_thickness = 3; // [1:0.5:8]
 
-/* [细节] */
-fillet_radius = 3; // [0.5:0.5:8]
-
 /* [Hidden] */
 $fn = 32;
 
+// 参数收敛：壁厚不能超过短边一半，底厚不能吃掉整个高度
+wall = min(wall_thickness, min(length, width) / 2 - 1);
+bottom = min(bottom_thickness, height - 1);
+
 difference() {
-  minkowski() {
-    cube([length - 2*fillet_radius, width - 2*fillet_radius, height - fillet_radius]);
-    cylinder(r = fillet_radius, h = fillet_radius);
-  }
-  translate([wall_thickness, wall_thickness, bottom_thickness])
-    cube([length - 2*wall_thickness, width - 2*wall_thickness, height - bottom_thickness + 1]);
+  cube([length, width, height]);
+  translate([wall, wall, bottom])
+    cube([length - 2*wall, width - 2*wall, height - bottom + 0.1]);
 }
 `,
   },
@@ -434,9 +440,10 @@ lid();
     applies: '铭牌、门牌、印章、浮雕文字',
     idea: '用 text() 生成 2D 文字，linear_extrude 拉伸成 3D',
     points: [
-      'text() 是 2D 原语，需要 linear_extrude',
-      'font 影响字体（默认 "Liberation Sans"）',
-      'halign/valign 控制对齐',
+      'text() 是 2D 原语，必须 linear_extrude 或投影后才能变 3D',
+      '不写 font 就用引擎默认的 Liberation Sans，最稳；写别的字体名可能找不到',
+      '引擎内置字体没有中文字形，中文会渲染成方框——要中文必须先上传系统字体',
+      'halign/valign 控制对齐；文字基准面放在底板上表面，两者才会连成一体',
     ],
     code: `/* [铭牌] */
 length = 100; // [40:5:300]
@@ -444,7 +451,7 @@ width = 40; // [20:5:100]
 thickness = 3; // [1:0.5:10]
 
 /* [文字] */
-text_content = "Hello"; // 输入文字
+text_content = "Hello"; // 仅拉丁字符（中文需先上传字体）
 text_size = 20; // [10:1:50]
 text_depth = 2; // [0.5:0.1:5]
 
@@ -454,10 +461,10 @@ $fn = 32;
 // 底板
 cube([length, width, thickness]);
 
-// 文字（居中）
+// 文字（居中，底面贴底板顶面）
 translate([length/2, width/2, thickness])
   linear_extrude(height = text_depth)
-    text(text_content, size = text_size, font = "Liberation Sans",
+    text(text_content, size = text_size,
          halign = "center", valign = "center");
 `,
   },
@@ -505,48 +512,64 @@ translate([0, 0, outer_r])
     name: '螺旋螺纹螺栓',
     category: '球体与螺纹',
     level: 'advanced',
-    applies: '螺纹件、螺母、螺栓、瓶盖',
-    idea: '用线性变换的剖面沿 Z 轴旋转上升，形成螺旋',
+    applies: '螺纹件、螺母、螺栓、瓶盖、需要真实螺旋升角的结构',
+    idea: '把螺纹剖面（径向×轴向的矩形）用 rotate_extrude 切成 10° 小段，每段转 10°、升高 pitch/36，逐段叠成一个真实的螺旋牙；下面是六角螺栓头，中心是螺杆芯',
     points: [
-      '用 for 循环 + rotate + translate 生成螺旋阵列',
-      '剖面是螺纹的横截面',
+      '螺纹是"小段旋转 + 逐段抬升"的螺旋：seg_angle = 360/36，seg_lift = pitch/36',
+      '每段 rotate_extrude 多扫 12%，段与段在角度上重叠，接缝不会出现缺口',
+      '牙高 thread_height 要小于 pitch，否则相邻两圈会粘在一起，看着就是个柱子',
+      '牙顶到牙底 thread_depth 决定螺纹多"咬"进螺杆芯；螺杆芯半径 = 外半径 - 牙深',
+      '螺栓头用 $fn=6 的圆柱，天然六角；它同时是整件贴床的底面',
     ],
-    code: `/* [螺纹] */
+    code: `/* [螺栓] */
 outer_diameter = 20; // [10:1:50]
 pitch = 3; // [1:0.5:10]
 turns = 5; // [2:1:20]
 thread_depth = 1.5; // [0.5:0.1:3]
+thread_height = 1.5; // [0.8:0.1:3]
+
+/* [螺栓头] */
+head_height = 8; // [5:1:20]
 
 /* [Hidden] */
-$fn = 32;
+$fn = 48;
+seg_per_turn = 36;
+seg_angle = 360 / seg_per_turn;
+seg_lift = pitch / seg_per_turn;
 
 outer_r = outer_diameter / 2;
 inner_r = outer_r - thread_depth;
+thread_len = turns * pitch;
 
-// 螺纹剖面（三角形）
-thread_profile = [
-  [inner_r, 0],
-  [outer_r, pitch/4],
-  [inner_r, pitch/2]
-];
+// 螺纹剖面（径向 × 轴向的矩形），绕 Z 扫一小段
+// 内缘故意埋进螺杆芯 0.6mm：贴着圆柱面放会产生共面破面
+module thread_segment() {
+  rotate_extrude(angle = seg_angle * 1.12)
+    polygon(points = [
+      [inner_r - 0.6, 0],
+      [outer_r, 0],
+      [outer_r, thread_height],
+      [inner_r - 0.6, thread_height]
+    ]);
+}
 
-// 生成螺旋螺纹
 module thread() {
-  for (i = [0 : turns * 4 - 1]) {
-    rotate([0, 0, i * 90])
-      translate([0, 0, i * pitch / 4])
-        rotate_extrude(angle = 90)
-          polygon(thread_profile);
-  }
+  for (i = [0 : turns * seg_per_turn - 1])
+    rotate([0, 0, i * seg_angle])
+      translate([0, 0, i * seg_lift])
+        thread_segment();
 }
 
-// 螺栓主体
-module bolt() {
-  cylinder(h = turns * pitch, r = inner_r);
-  thread();
+union() {
+  // 六角螺栓头（贴床）
+  cylinder(h = head_height, r = outer_r + 2, $fn = 6);
+  // 螺杆芯
+  translate([0, 0, head_height])
+    cylinder(h = thread_len + 1, r = inner_r);
+  // 螺旋牙
+  translate([0, 0, head_height])
+    thread();
 }
-
-bolt();
 `,
   },
   {
@@ -595,11 +618,12 @@ translate([0, 0, bottom_extent]) organic_shape();
     category: '山水景观',
     level: 'advanced',
     applies: '山脉、群峰、山形摆件、低多边形景观',
-    idea: '圆台（r1 > r2）就是山坡；$fn 取小值（4~6）在真引擎里渲染成棱锥，形成低多边形风格。主峰居中，副峰绕圈',
+    idea: '圆台（r1 > r2）就是山坡；$fn 取 5~6 在真引擎里渲染成棱锥，形成低多边形风格。主峰居中、副峰沿椭圆环排，峰径由底座尺寸反推，绝不超出底板',
     points: [
-      '山 = 岩体圆台 + 雪顶锥体（两层圆柱叠放）',
-      '坡度可打印：峰底半径 ≥ 峰高 × 0.6',
-      '底座先铺，山峰都从底座顶面 (z = base_height) 起',
+      '峰底半径必须由底座反推：main_r ≤ min(底长, 底宽)/2 - 4，否则山脚悬空到底板外面',
+      '副峰中心排在一个椭圆上，椭圆的 rx / ry 也要扣掉副峰半径，四角不会越界',
+      '山 = 岩体圆台 + 雪顶锥体（两层圆柱叠放），雪顶从 %(1-snow_ratio) 高度起',
+      '所有山峰从底座顶面 (z = base_height) 起，和底板实体重叠',
     ],
     code: `/* [底座] */
 base_length = 120; // [60:5:250]
@@ -607,18 +631,21 @@ base_width = 80; // [40:5:150]
 base_height = 5; // [3:1:12]
 
 /* [山峰] */
-main_height = 80; // [30:5:160]
-side_height = 45; // [15:5:100]
+main_height = 70; // [30:5:160]
+side_height = 40; // [15:5:100]
 side_count = 4; // [0:1:8]
 snow_ratio = 0.25; // [0.1:0.05:0.5]
 
 /* [Hidden] */
 $fn = 5;
 
-ring_r = min(base_length, base_width) * 0.3;
+// 峰径由底座反推：保证整个山脚都落在底板以内
+main_r = min(main_height * 0.55, min(base_length, base_width) / 2 - 4);
+side_r = min(side_height * 0.55, min(base_length, base_width) / 2 - 6);
+ring_rx = max(0, base_length / 2 - side_r - 4);
+ring_ry = max(0, base_width / 2 - side_r - 4);
 
-module mountain(h) {
-  r = h * 0.7;
+module mountain(h, r) {
   cylinder(h = h * (1 - snow_ratio), r1 = r, r2 = r * snow_ratio * 1.2);
   translate([0, 0, h * (1 - snow_ratio)])
     cylinder(h = h * snow_ratio, r1 = r * snow_ratio * 1.2, r2 = 0);
@@ -627,14 +654,15 @@ module mountain(h) {
 union() {
   cube([base_length, base_width, base_height]);
   translate([base_length / 2, base_width / 2, base_height])
-    mountain(main_height);
-  for (i = [0 : side_count - 1]) {
-    angle = i * 360 / max(side_count, 1);
-    translate([base_length / 2 + ring_r * cos(angle),
-               base_width / 2 + ring_r * sin(angle),
-               base_height])
-      mountain(side_height);
-  }
+    mountain(main_height, main_r);
+  if (side_count > 0)
+    for (i = [0 : side_count - 1]) {
+      angle = i * 360 / side_count;
+      translate([base_length / 2 + ring_rx * cos(angle),
+                 base_width / 2 + ring_ry * sin(angle),
+                 base_height])
+        mountain(side_height, side_r);
+    }
 }
 `,
   },
@@ -841,10 +869,12 @@ difference() {
     category: '轴对称容器',
     level: 'classic',
     applies: '马克杯、水杯、带把手容器、啤酒杯',
-    idea: '杯身 = 圆筒 difference 内腔；把手 = 圆剖面 offset 后 rotate_extrude 成竖直圆环，一半埋进杯壁',
+    idea: '杯身 = 圆筒 difference 内腔；把手 = 半圆环（rotate_extrude 只扫 180°），两端埋进杯壁，最后再整体挖一次内腔，保证把手不会伸进杯子里',
     points: [
-      '把手环中心放到杯壁内侧 (cup_r - 埋深)，保证与壁实体相连',
-      'rotate([90,0,0]) 把水平圆环立成竖直',
+      '把手必须是半圆环：rotate_extrude(angle=180) 再绕 Z 转 -90°，得到的弧从杯子上下两端向外鼓',
+      '环心放在杯壁内侧 (cup_r - embed)，两端端点埋进壁里，union 后是实体连接',
+      '先 union 把手再 difference 内腔：伸进杯内那一截会被切掉，内壁保持干净',
+      'handle_ring 是整环直径，实际把手高度只有一半；环越大把手越高',
       '演算：管中心半径 r_mid = (handle_out + handle_in) / 2，handle_in = handle_out - handle_thickness',
     ],
     code: `/* [杯身] */
@@ -854,30 +884,38 @@ wall_thickness = 3; // [1.5:0.5:6]
 bottom_thickness = 4; // [2:0.5:8]
 
 /* [把手] */
-handle_ring = 32; // [18:2:60]
-handle_thickness = 7; // [4:0.5:12]
-embed = 2; // [1:0.5:5]
+handle_ring = 50; // [18:2:70]
+handle_thickness = 8; // [4:0.5:12]
+embed = 3; // [1:0.5:5]
 
 /* [Hidden] */
 $fn = 64;
 
 cup_r = cup_diameter / 2;
 handle_out = handle_ring / 2;
-// 内半径下限 0.5：handle_thickness 取大值时不会出现负半径（rotate_extrude 会自交）
+// 内半径下限 0.5：handle_thickness 取大值时不会出现负半径
 handle_in = max(handle_out - handle_thickness, 0.5);
+handle_mid = (handle_out + handle_in) / 2;
+
+// 半圆环，埋在杯壁 embed 毫米处
+module handle() {
+  translate([cup_r - embed, 0, cup_height / 2])
+    rotate([90, 0, 0])
+      rotate([0, 0, -90])
+        rotate_extrude(angle = 180)
+          translate([handle_mid, 0])
+            circle(r = handle_thickness / 2);
+}
 
 difference() {
-  cylinder(h = cup_height, r = cup_r);
+  union() {
+    cylinder(h = cup_height, r = cup_r);
+    handle();
+  }
+  // 内腔最后挖：把手伸进杯内的部分被一起切掉
   translate([0, 0, bottom_thickness])
     cylinder(h = cup_height, r = cup_r - wall_thickness);
 }
-
-// D 形把手：竖直圆环，埋进杯壁 embed 毫米
-translate([cup_r - embed, 0, cup_height / 2])
-  rotate([90, 0, 0])
-    rotate_extrude()
-      translate([(handle_out + handle_in) / 2, 0])
-        circle(handle_thickness / 2);
 `,
   },
   {
@@ -1041,10 +1079,13 @@ translate([saucer_diameter / 2 + pot_top_r + 12, 0, 0])
     category: '园艺家居',
     level: 'classic',
     applies: '手机支架、平板托架、展示架、阅读架',
-    idea: '托槽 = 外方块 − 内腔（留出手机厚度空间），前唇挡滑；背板从托槽后沿向上仰起 (90 - tilt_angle)',
+    idea: '托槽 = 外方块 − 内腔（留出手机厚度空间），前唇挡滑；背板绕 X 轴倾斜 tilt_angle 度（从竖直向后仰），手机靠在上面',
     points: [
-      '演算：托槽内宽 = phone_width，内深 = phone_depth + 余量；背板旋转支点在托槽后上沿，rotate([-(90 - tilt), 0, 0])',
-      '前唇高度 lip_height 挡手机下沿，不遮屏幕',
+      '背板倾角就是 rotate([-tilt_angle, 0, 0])：tilt=18 表示从竖直向后倒 18°，不是从水平算',
+      '背板根部要压在托槽后沿上并低于槽底 1mm，union 才有实体连接',
+      '托槽内深 = phone_depth + 余量，手机底部连同保护壳一起塞得进去',
+      '前唇 lip_height 只挡手机下沿，不要高到遮住屏幕',
+      '演算：背板高度方向 = +Z 绕 X 轴旋转 -tilt 后的方向向量 [0, sin(tilt), cos(tilt)]',
     ],
     code: `/* [支架] */
 phone_width = 75; // [60:5:110]
@@ -1068,10 +1109,10 @@ module tray() {
   }
 }
 
-// 背板：绕托槽后沿仰起
+// 背板：根部压在托槽后沿，绕 X 轴向后仰 tilt_angle
 module back() {
   translate([0, tray_depth + material, 0])
-    rotate([-(90 - tilt_angle), 0, 0])
+    rotate([-tilt_angle, 0, 0])
       translate([0, -material, 0])
         cube([phone_width + 2*material, material, back_height]);
 }
@@ -1176,24 +1217,30 @@ for (i = [0 : bar_count - 1]) {
     idea: '对数螺旋 r = r0·φ^(θ/90°)（每转过 90° 半径乘黄金比 φ=1.618，正是斐波那契数列相邻项之比的极限）。外缘点列 + 内缘点列反向拼成环带 polygon，linear_extrude 拉伸成盘',
     points: [
       '演算：spiral_r(θ) = r0 * pow(phi, θ/90)，θ 步长 5° 平滑',
+      '螺旋必须坐在一块圆底板上，否则只是一条悬空的带子；带子最高点留 2mm 边距',
       '带状闭合 = 外缘（θ 从 0→总角）+ 内缘（θ 从 总角→0，半径减带宽）',
-      '内缘半径下限 0.4：中心段带宽自动收窄，r0 < 带宽时也不会出现负半径翻点',
+      '带宽要小于起始半径：bw = min(band_width, r0 - 3)，否则中心段退化成一个自交尖角（实测会有 2 条开放边）',
     ],
     code: `/* [螺旋盘] */
 outer_diameter = 100; // [50:5:200]
 turns = 2; // [1:0.5:4]
 band_width = 6; // [2:0.5:15]
-thickness = 5; // [2:0.5:12]
+thickness = 6; // [3:0.5:12]
+
+/* [底板] */
+base_thickness = 2; // [1:0.5:6]
 
 /* [Hidden] */
 $fn = 64;
 
 phi = (1 + sqrt(5)) / 2;
-r0 = outer_diameter / 2 / pow(phi, turns * 360 / 90);
+r_end = outer_diameter / 2 - 2;
+r0 = r_end / pow(phi, turns * 360 / 90);
 
 function spiral_r(t) = r0 * pow(phi, t / 90);
-// 内缘半径下限 0.4：r0 < band_width 时避免负半径把点翻到对侧
-function band_inner_r(t) = max(spiral_r(t) - band_width, 0.4);
+// 带宽不能吃掉起始半径，否则中心段会退化成一个自交的尖角
+bw = max(1, min(band_width, r0 - 3));
+function band_inner_r(t) = max(spiral_r(t) - bw, 0.4);
 total = turns * 360;
 
 outer_edge = [ for (t = [0 : 5 : total])
@@ -1201,8 +1248,15 @@ outer_edge = [ for (t = [0 : 5 : total])
 inner_edge = [ for (t = [total : -5 : 0])
   [band_inner_r(t) * cos(t), band_inner_r(t) * sin(t)] ];
 
-linear_extrude(height = thickness)
-  polygon(concat(outer_edge, inner_edge));
+union() {
+  // 圆底板
+  linear_extrude(height = base_thickness)
+    circle(r = outer_diameter / 2);
+  // 螺旋带（坐在底板上）
+  translate([0, 0, base_thickness - 0.5])
+    linear_extrude(height = thickness + 0.5)
+      polygon(concat(outer_edge, inner_edge));
+}
 `,
   },
   {
@@ -1211,50 +1265,61 @@ linear_extrude(height = thickness)
     category: '数学曲线',
     level: 'advanced',
     applies: '阿基米德螺旋、等距螺旋、香薰盘、迷宫盘',
-    idea: '阿基米德螺旋 r = r0 + k·θ（半径随角度线性增长，圈距处处相等，与对数螺旋的"越转越密"相反）。螺旋槽盘中心留蜡烛台',
+    idea: '阿基米德螺旋 r = r0 + k·θ（圈距处处相等）。盘面挖一条等宽螺旋槽，盘心再挖茶蜡凹槽；槽必须按 6° 小段逐段挖，不能用一个自交的大多边形',
     points: [
-      '演算：r(θ) = r0 + (盘半径 - r0 - 边缘余量) * θ / 总角',
-      '槽 = 外缘带 − 内缘带；圈距 = 带宽 × 2 左右才有槽感',
-      '中心圆台承托蜡烛，比螺旋起点高出一截',
+      '演算：r(θ) = r0 + (盘半径 - r0 - 边距) × θ / 总角，槽宽固定 band_width',
+      '槽是"挖"出来的，不是凸起来的一条带：difference 盘体，槽深 = plate_thickness - 留底',
+      '螺旋槽逐 6° 一段用梯形多边形挖，相邻段共享边界，避免大 polygon 自交翻面',
+      '槽起点半径要大于烛槽半径，两个凹槽之间至少留 3mm 料',
+      '中心烛槽最后挖，深度浅于槽深，茶蜡放进去不会掉到底',
     ],
-    code: `/* [香薰盘] */
+    code: `/* [盘体] */
 plate_diameter = 110; // [60:5:220]
 plate_thickness = 6; // [3:0.5:12]
 turns = 3; // [2:0.5:5]
-band_width = 4; // [2:0.5:10]
+band_width = 5; // [2:0.5:10]
+groove_depth = 3; // [1:0.5:5]
 
-/* [蜡烛台] */
+/* [烛槽] */
 candle_diameter = 40; // [20:5:70]
-candle_lip = 6; // [2:0.5:12]
+candle_depth = 2; // [1:0.5:6]
 
 /* [Hidden] */
 $fn = 64;
 
 plate_r = plate_diameter / 2;
-r0 = candle_diameter / 2 + 2;
+r0 = candle_diameter / 2 + 3;
+r_max = plate_r - 6;
 total = turns * 360;
-r_max = plate_r - 4;
+depth = min(groove_depth, plate_thickness - 1.5);
 
 function arch_r(t) = r0 + (r_max - r0) * t / total;
 
-outer_edge = [ for (t = [0 : 5 : total])
-  [arch_r(t) * cos(t), arch_r(t) * sin(t)] ];
-inner_edge = [ for (t = [total : -5 : 0])
-  [(arch_r(t) - band_width) * cos(t), (arch_r(t) - band_width) * sin(t)] ];
+// 一段 6° 的螺旋槽（梯形多边形）
+module groove_segment(t0, t1) {
+  r0a = arch_r(t0);
+  r1a = arch_r(t1);
+  inner0 = max(r0a - band_width, 1);
+  inner1 = max(r1a - band_width, 1);
+  polygon(points = [
+    [r0a * cos(t0), r0a * sin(t0)],
+    [r1a * cos(t1), r1a * sin(t1)],
+    [inner1 * cos(t1), inner1 * sin(t1)],
+    [inner0 * cos(t0), inner0 * sin(t0)]
+  ]);
+}
 
-union() {
-  // 盘底
+difference() {
   linear_extrude(height = plate_thickness)
     circle(r = plate_r);
-  // 螺旋槽带
-  linear_extrude(height = plate_thickness + 2)
-    polygon(concat(outer_edge, inner_edge));
-  // 中心蜡烛台
-  translate([0, 0, plate_thickness])
-    difference() {
-      cylinder(h = candle_lip, d = candle_diameter);
-      translate([0, 0, 2]) cylinder(h = candle_lip, d = candle_diameter - 6);
-    }
+  // 螺旋槽
+  for (t = [0 : 6 : total - 6])
+    translate([0, 0, plate_thickness - depth])
+      linear_extrude(height = depth + 1)
+        groove_segment(t, t + 6);
+  // 中心烛槽
+  translate([0, 0, plate_thickness - candle_depth])
+    cylinder(h = candle_depth + 1, r = candle_diameter / 2);
 }
 `,
   },
@@ -1266,25 +1331,25 @@ union() {
     applies: '高斯曲线/正态分布曲面、钟形摆件、僧帽、裙摆造型',
     idea: '高斯函数 y = h·e^(−(x/σ)²)。把这条 bell curve 作为剖面绕轴旋转（rotate_extrude），就是经典正态分布曲面。σ 控制胖瘦，h 控制峰高',
     points: [
-      '演算：剖面点 [x, h * exp(-pow(x/sigma, 2))]，x 从 0 采样到 3σ（之后趋近 0）',
-      '剖面闭合：首点 [0,0] 封底 → 曲线 → 尾点 [3σ, 0] 回到轴',
-      '底部加圆环底座更稳',
+      '演算：剖面点 [x, h * exp(-pow(x/sigma, 2))]，x 从 0 采样到 2.5σ（之后趋近 0）',
+      '剖面闭合：首点 [0,0] 封底 → 曲线 → 尾点 [2.5σ, 0] 回到轴',
+      'σ = 全宽/5：σ 太小会变成尖锥，肩部要占全宽的一半才像钟形',
     ],
     code: `/* [钟形] */
-bell_height = 70; // [30:5:160]
-bell_width = 60; // [30:5:140]
+bell_height = 40; // [20:5:160]
+bell_width = 120; // [50:5:200]
 
 /* [底座] */
-base_diameter = 70; // [40:5:120]
+base_diameter = 120; // [40:5:200]
 base_height = 5; // [3:1:12]
 
 /* [Hidden] */
 $fn = 64;
 
-sigma = bell_width / 4;  // 4σ = 全宽，两端曲线趋近零
-x_max = bell_width / 2;
+sigma = bell_width / 5;  // 5σ 覆盖全宽，肩部饱满，不会缩成尖锥
+x_max = min(2.5 * sigma, bell_width / 2);
 
-curve_pts = [ for (x = [0 : 1.5 : x_max])
+curve_pts = [ for (x = [0 : 2 : x_max])
   [x, bell_height * exp(-pow(x / sigma, 2))] ];
 profile = concat([[0, 0]], curve_pts, [[x_max, 0]]);
 
@@ -2403,9 +2468,9 @@ wall_thickness = 2.5; // [1.5:0.5:5]
 bottom_thickness = 3; // [2:0.5:8]
 
 /* [螺旋] */
-twist_angle = 120; // [0:15:360]
+twist_angle = 90; // [0:15:360]
 ripple_count = 6; // [0:1:12]
-ripple_depth = 0.12; // [0:0.02:0.3]
+ripple_depth = 0.06; // [0:0.02:0.3]
 top_scale = 0.8; // [0.65:0.05:1.2]
 
 /* [细节] */
@@ -2496,7 +2561,7 @@ union() {
 }
 
 // 右件：块体 - 榫槽（沿 Z 贯通，从上方套入）
-translate([block_w + part_gap, block_d + part_gap, 0])
+translate([block_w + part_gap, 0, 0])
   difference() {
     cube([block_w, block_d, block_h]);
     translate([block_w / 2, 0, -1])
@@ -2804,58 +2869,6 @@ translate([0, shaft_y0, shaft_z])
 `,
   },
   {
-    id: 55,
-    name: '便签弹簧夹',
-    category: '桌面收纳',
-    level: 'basic',
-    applies: '便签/便条夹、票据夹、名片立夹、食谱卡片夹',
-    idea: '一整块立柱从顶面往下开"上宽下窄"的楔形缝：上半段宽口引纸，下半段窄缝夹紧，缝隙底部留料当弹性铰点',
-    points: [
-      '缝分两段：上段开口宽（3mm 左右）引纸，下段窄缝（1.2~1.6mm）夹持',
-      '缝深用 min() 收敛到柱高的 75%，根部留够材料，否则一插就断',
-      '窄缝底要高于底脚顶面，否则夹子会被切成两半',
-      '缝沿 X 贯通整个柱宽，纸才能从顶部插进去',
-    ],
-    code: `/* [夹体] */
-clip_width = 30; // [20:1:60]
-clip_depth = 18; // [12:1:40]
-clip_height = 40; // [20:1:80]
-
-/* [夹口] */
-jaw_gap = 1.4; // [0.8:0.1:3]
-mouth_gap = 3.4; // [2:0.2:8]
-slot_depth = 30; // [10:1:60]
-
-/* [底脚] */
-base_thickness = 4; // [2:0.5:10]
-base_margin = 3; // [0:0.5:10]
-
-/* [Hidden] */
-$fn = 32;
-
-cut_h = min(slot_depth, clip_height * 0.75);
-mouth_h = min(cut_h * 0.45, clip_depth * 0.6);
-narrow_h = cut_h - mouth_h;
-narrow_bottom = clip_height - cut_h;
-
-difference() {
-  union() {
-    // 立柱
-    cube([clip_width, clip_depth, clip_height]);
-    // 底脚：比立柱宽一圈
-    translate([-base_margin, -base_margin, 0])
-      cube([clip_width + 2 * base_margin, clip_depth + 2 * base_margin, base_thickness]);
-  }
-  // 窄缝（夹持段）
-  translate([-1, (clip_depth - jaw_gap) / 2, narrow_bottom])
-    cube([clip_width + 2, jaw_gap, narrow_h + 1]);
-  // 宽口（引纸段）
-  translate([-1, (clip_depth - mouth_gap) / 2, clip_height - mouth_h])
-    cube([clip_width + 2, mouth_gap, mouth_h + 1]);
-}
-`,
-  },
-  {
     id: 56,
     name: '直角角码',
     category: '实用工具',
@@ -2932,16 +2945,16 @@ difference() {
       '别用 hull 逐段链式放样：叶片本体干净，但和桨毂 union 后接缝处会随机冒出 8~40 条非流形边（实测）',
     ],
     code: `/* [桨毂] */
-hub_diameter = 20; // [12:1:40]
-hub_height = 14; // [8:1:30]
+hub_diameter = 26; // [12:1:50]
+hub_height = 16; // [8:1:30]
 shaft_bore = 5.2; // [0:0.2:12]
 
 /* [桨叶] */
-blade_count = 2; // [2:1:5]
-blade_length = 70; // [30:5:120]
-root_chord = 12; // [6:0.5:24]
-root_thickness = 3.2; // [1.5:0.2:6]
-tip_scale = 0.5; // [0.25:0.05:1]
+blade_count = 3; // [2:1:5]
+blade_length = 60; // [30:5:120]
+root_chord = 24; // [10:0.5:40]
+root_thickness = 4; // [1.5:0.2:8]
+tip_scale = 0.55; // [0.25:0.05:1]
 
 /* [扭转] */
 root_pitch = 30; // [0:5:60]
@@ -3136,7 +3149,8 @@ difference() {
       '字符串是塞一堆数据的轻量写法：每格一个字符，16×16 只有 256 字节',
       'OpenSCAD 没有字符串下标，但可以直接迭代字符串，for (c = pixels) 逐个拿到 1 字符',
       'ord(c) 取字符编码，减 48 就是 0~9 的数字；0 = 空白，1~3 = 逐级变高',
-      '底座用 offset + linear_extrude 做圆角，所有像素块下沉 0.5mm 与底座相交',
+      '底座用 offset + linear_extrude 做圆角，所有像素块下沉 1mm 与底座相交',
+      '像素块露出高度 = 等级 × layer_height，从底板顶面往上长；不要从底板内部起算',
       '拼豆珠 = 圆柱减通孔，孔只在该珠自己的 difference 里切，不会伤到底板',
       '格子按 0.84 倍收缩留缝，像素之间才有分隔感；改 cell 就能整体缩放',
     ],
@@ -3194,13 +3208,13 @@ union() {
       if (v > 0) {
         x = -board_w / 2 + (i + 0.5) * cell;
         y = board_d / 2 - (j + 0.5) * cell;
-        translate([x, y, base_thickness - 0.5]) {
+        translate([x, y, base_thickness - 1]) {
           if (style == 0) {
             translate([-cell * 0.42, -cell * 0.42, 0])
-              cube([cell * 0.84, cell * 0.84, v * layer_height + 0.5]);
+              cube([cell * 0.84, cell * 0.84, v * layer_height + 1]);
           } else {
             difference() {
-              cylinder(h = bead_height + 0.5, r = cell * 0.42);
+              cylinder(h = bead_height + 1, r = cell * 0.42);
               translate([0, 0, -0.5])
                 cylinder(h = bead_height + 2, r = cell * 0.17);
             }
@@ -3575,102 +3589,6 @@ union() {
         rotate([0, 90, 0])
           cylinder(h = 2 * helix_radius, r = rung_radius, center = true);
   }
-}
-`,
-  },
-  {
-    id: 66,
-    name: '平面关节机械臂',
-    category: '机械装配',
-    level: 'advanced',
-    applies: '桌面摆件、关节机构演示、机器人入门教具、可摆姿势的平面连杆',
-    idea: '底座、大臂、小臂、夹爪四块板全部平躺打印，用三根销轴串起来；每条臂两端各一个销孔，孔比销大 0.4mm，装好后可以摆姿势、能反复拆装',
-    points: [
-      '臂身是两端圆的胶囊形：hull() 两个圆柱，比手写多边形更省事且轮廓光滑',
-      '销孔直径 = 销径 + 2×clearance，默认 0.4 间隙；过盈会装不进去，间隙太大又会晃',
-      '销轴 = 光杆 + 端帽，光杆长度按"穿过几层板"算：两层臂 = 2×臂厚 + 4',
-      '夹爪用胶囊底板减一条开口槽，右侧留两根 9mm 宽的指；槽从端面切进去，不要做成盲槽',
-      '所有零件平铺在热床上，销轴单独排一行；这是一套装配件，不是单体',
-      '装配顺序：底座→大臂→小臂→夹爪，每层之间垫平垫圈可减少摩擦',
-    ],
-    code: `/* [臂尺寸] */
-link1 = 110; // [60:5:200]
-link2 = 80; // [40:5:150]
-arm_width = 24; // [12:2:50]
-arm_thickness = 12; // [8:1:30]
-joint_d = 8; // [4:0.5:16]
-clearance = 0.4; // [0.2:0.05:1]
-
-/* [底座与夹爪] */
-base_d = 70; // [40:5:120]
-base_thickness = 8; // [5:1:20]
-claw_length = 50; // [30:5:90]
-
-/* [排布] */
-part_gap = 14; // [8:2:40]
-
-/* [Hidden] */
-$fn = 40;
-
-hole_d = joint_d + 2 * clearance;
-pin_len = 2 * arm_thickness + 4;
-
-module link(len) {
-  difference() {
-    hull() {
-      translate([-len / 2, 0, 0]) cylinder(h = arm_thickness, r = arm_width / 2);
-      translate([ len / 2, 0, 0]) cylinder(h = arm_thickness, r = arm_width / 2);
-    }
-    for (x = [-len / 2, len / 2])
-      translate([x, 0, -1])
-        cylinder(h = arm_thickness + 2, r = hole_d / 2);
-  }
-}
-
-module base() {
-  difference() {
-    cylinder(h = base_thickness, r = base_d / 2);
-    translate([0, 0, -1])
-      cylinder(h = base_thickness + 2, r = hole_d / 2);
-  }
-}
-
-module claw() {
-  difference() {
-    hull() {
-      translate([-claw_length / 2, 0, 0]) cylinder(h = arm_thickness, r = arm_width / 2);
-      translate([ claw_length / 2, 0, 0]) cylinder(h = arm_thickness, r = arm_width / 2);
-    }
-    // 根部关节孔
-    translate([-claw_length / 2, 0, -1])
-      cylinder(h = arm_thickness + 2, r = hole_d / 2);
-    // 开口槽：从右端切进去，留两根夹指
-    translate([claw_length / 2 - 12, -3, -1])
-      cube([26, 6, arm_thickness + 2]);
-  }
-}
-
-module pin() {
-  union() {
-    cylinder(h = pin_len, r = joint_d / 2);
-    translate([0, 0, pin_len - 2])
-      cylinder(h = 2, r = joint_d / 2 + 3);
-  }
-}
-
-// 平铺：底座 / 大臂 / 小臂 / 夹爪 / 三根销
-x0 = 0;
-x1 = base_d / 2 + part_gap + link1 / 2;
-x2 = x1 + link1 / 2 + part_gap + link2 / 2;
-x3 = x2 + link2 / 2 + part_gap + claw_length / 2;
-
-union() {
-  translate([x0, 0, 0]) base();
-  translate([x1, 0, 0]) link(link1);
-  translate([x2, 0, 0]) link(link2);
-  translate([x3, 0, 0]) claw();
-  for (i = [0 : 2])
-    translate([x1 - 20 + i * 22, -base_d / 2 - 25, 0]) pin();
 }
 `,
   },
