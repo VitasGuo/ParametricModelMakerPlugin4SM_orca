@@ -8,6 +8,8 @@ import { button, clear, el } from './dom.js';
 interface ControlBinding {
   param: ScadParam;
   sync: (value: ParamValue) => void;
+  /** 正在被用户编辑的文本控件；同步时跳过它，避免光标跳动。 */
+  focusEl?: HTMLElement;
 }
 
 export class ParamPanel {
@@ -16,7 +18,6 @@ export class ParamPanel {
   private readonly list: HTMLElement;
   private signature = '';
   private bindings: ControlBinding[] = [];
-  private focused: HTMLElement | null = null;
 
   constructor(container: HTMLElement, store: Store) {
     this.container = container;
@@ -46,8 +47,8 @@ export class ParamPanel {
     }
 
     for (const binding of this.bindings) {
-      // 正在输入的控件不覆盖，避免光标跳动
-      if (this.focused && document.activeElement === this.focused) continue;
+      // 只跳过正在输入的那一个控件，其它参数照常同步（避免光标跳动的同时不冻结整个面板）
+      if (binding.focusEl && document.activeElement === binding.focusEl) continue;
       binding.sync(state.project.paramValues[binding.param.name] ?? binding.param.default);
     }
 
@@ -94,12 +95,12 @@ export class ParamPanel {
     row.append(label, controlBox);
 
     const set = (value: ParamValue) => this.store.setParam(param.name, value);
-    const markFocus = (el: HTMLElement) => {
+    const markFocus = (binding: ControlBinding, el: HTMLElement) => {
       el.addEventListener('focus', () => {
-        this.focused = el;
+        binding.focusEl = el;
       });
       el.addEventListener('blur', () => {
-        if (this.focused === el) this.focused = null;
+        if (binding.focusEl === el) binding.focusEl = undefined;
       });
     };
 
@@ -127,9 +128,7 @@ export class ParamPanel {
           range.value = String(value);
           set(value);
         });
-        markFocus(number);
-        controlBox.append(range, number);
-        this.bindings.push({
+        const binding: ControlBinding = {
           param,
           sync: (value) => {
             const valueNum = typeof value === 'number' ? value : Number(value);
@@ -137,7 +136,10 @@ export class ParamPanel {
             range.value = String(safe);
             if (document.activeElement !== number) number.value = String(safe);
           },
-        });
+        };
+        markFocus(binding, number);
+        controlBox.append(range, number);
+        this.bindings.push(binding);
         break;
       }
 
@@ -188,14 +190,16 @@ export class ParamPanel {
           set(color.value);
         });
         controlBox.append(color, text);
-        this.bindings.push({
+        const binding: ControlBinding = {
           param,
           sync: (value) => {
             const stringValue = String(value);
             text.value = stringValue;
             if (/^#[0-9a-f]{6}$/i.test(stringValue)) color.value = stringValue;
           },
-        });
+        };
+        markFocus(binding, text);
+        this.bindings.push(binding);
         break;
       }
 
@@ -205,7 +209,14 @@ export class ParamPanel {
         text.placeholder = '字体名，如 Liberation Sans';
         text.addEventListener('change', () => set(text.value.trim()));
         controlBox.appendChild(text);
-        this.bindings.push({ param, sync: (value) => (text.value = String(value)) });
+        const binding: ControlBinding = {
+          param,
+          sync: (value) => {
+            if (document.activeElement !== text) text.value = String(value);
+          },
+        };
+        markFocus(binding, text);
+        this.bindings.push(binding);
         break;
       }
 
@@ -215,12 +226,14 @@ export class ParamPanel {
         text.type = 'text';
         text.addEventListener('change', () => set(text.value));
         controlBox.appendChild(text);
-        this.bindings.push({
+        const binding: ControlBinding = {
           param,
           sync: (value) => {
             if (document.activeElement !== text) text.value = String(value);
           },
-        });
+        };
+        markFocus(binding, text);
+        this.bindings.push(binding);
         break;
       }
     }

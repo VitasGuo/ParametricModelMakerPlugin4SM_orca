@@ -21,6 +21,8 @@ export class Viewer {
   private grid: THREE.GridHelper | null = null;
   private readonly resizeObserver: ResizeObserver;
   private wireframe = false;
+  private rafId: number | null = null;
+  private visible = true;
 
   constructor(private readonly container: HTMLElement) {
     this.renderer = new THREE.WebGLRenderer({
@@ -56,7 +58,7 @@ export class Viewer {
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(container);
     this.resize();
-    this.animate();
+    this.startLoop();
   }
 
   /** 加载二进制 STL。 */
@@ -209,13 +211,38 @@ export class Viewer {
     this.camera.updateProjectionMatrix();
   }
 
+  /** 源码页签遮挡预览时暂停渲染循环；恢复可见时重启。 */
+  setVisible(visible: boolean): void {
+    if (this.visible === visible) return;
+    this.visible = visible;
+    if (visible) {
+      this.resize();
+      this.startLoop();
+    } else {
+      this.stopLoop();
+    }
+  }
+
+  private startLoop(): void {
+    if (this.rafId !== null) return;
+    this.rafId = requestAnimationFrame(this.animate);
+  }
+
+  private stopLoop(): void {
+    if (this.rafId !== null) {
+      cancelAnimationFrame(this.rafId);
+      this.rafId = null;
+    }
+  }
+
   private animate = (): void => {
-    requestAnimationFrame(this.animate);
+    this.rafId = requestAnimationFrame(this.animate);
     this.controls.update();
     this.renderer.render(this.scene, this.camera);
   };
 
   dispose(): void {
+    this.stopLoop();
     this.resizeObserver.disconnect();
     this.clearMesh();
     this.controls.dispose();

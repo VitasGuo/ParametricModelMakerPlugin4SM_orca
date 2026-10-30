@@ -250,17 +250,23 @@ function measureOne(
     case 'center': {
       const tol = check.tol ?? DEFAULT_TOL.center;
       const measured = dist(check.a, check.b);
+      // 两个轴点必须落在网格包围盒内，防止声明坐标本身就在模型外
+      const inBox = (p: Vec3): boolean =>
+        [0, 1, 2].every((i) => p[i]! >= mesh.min[i]! - 1 && p[i]! <= mesh.max[i]! + 1);
       const boreA = castRay(mesh, check.a, Z_UP, 400).length === 0;
       const boreB = castRay(mesh, check.b, Z_UP, 400).length === 0;
-      const note = !boreA || !boreB ? `A 轴孔${boreA ? '通透' : '被挡'}、B 轴孔${boreB ? '通透' : '被挡'}` : undefined;
+      const notes: string[] = [];
+      if (!inBox(check.a) || !inBox(check.b)) notes.push('轴点坐标在模型包围盒之外');
+      else if (!boreA || !boreB)
+        notes.push(`A 轴孔${boreA ? '通透' : '被挡'}、B 轴孔${boreB ? '通透' : '被挡'}`);
       return [
         {
           label: `中心距 ${pointLabel(check.a)}↔${pointLabel(check.b)}`,
           expected: check.distance,
           measured,
           tol,
-          ok: Math.abs(measured - check.distance) <= tol && boreA && boreB,
-          ...(note ? { note } : {}),
+          ok: Math.abs(measured - check.distance) <= tol && boreA && boreB && inBox(check.a) && inBox(check.b),
+          ...(notes.length ? { note: notes.join('；') } : {}),
         },
       ];
     }
@@ -328,7 +334,10 @@ function measurePitch(
   }
   const gaps = hits.slice(1).map((h, i) => h.t - hits[i]!.t);
   const sorted = [...gaps].sort((a, b) => a - b);
-  const median = sorted[Math.floor(sorted.length / 2)]!;
+  // 偶数个间距取中间两数的均值，避免系统性偏大（pitch 公差只有 0.15mm）
+  const mid = sorted.length >> 1;
+  const median =
+    sorted.length % 2 === 1 ? sorted[mid]! : (sorted[mid - 1]! + sorted[mid]!) / 2;
   // 间距离散度太大说明探针扫到了别的东西（倒角、台阶、顶面）
   const maxGap = sorted[sorted.length - 1]!;
   if (maxGap > median * 1.8) {
@@ -384,6 +393,8 @@ function pointLabel(p: Vec3): string {
 interface TriangleSoup {
   /** 每 9 个浮点一个三角形：ax ay az bx by bz cx cy cz。 */
   data: Float64Array;
+  /** 每个三角形 6 个浮点的 AABB（minx miny minz maxx maxy maxz），射线预筛用。 */
+  bounds: Float32Array;
   min: Vec3;
   max: Vec3;
 }
@@ -401,11 +412,13 @@ function loadMesh(buffer: ArrayBuffer): TriangleSoup {
   const view = new DataView(buffer);
   const count = view.getUint32(80, true);
   const data = new Float64Array(count * 9);
+  const bounds = new Float32Array(count * 6);
   const min: Vec3 = [Infinity, Infinity, Infinity];
   const max: Vec3 = [-Infinity, -Infinity, -Infinity];
 
   for (let i = 0; i < count; i += 1) {
     const base = 84 + i * 50 + 12;
+    const bbase = i * 6;
     for (let k = 0; k < 9; k += 1) {
       const value = view.getFloat32(base + k * 4, true);
       data[i * 9 + k] = value;
@@ -413,8 +426,18 @@ function loadMesh(buffer: ArrayBuffer): TriangleSoup {
       if (value < min[axis]!) min[axis] = value;
       if (value > max[axis]!) max[axis] = value;
     }
+    // 每三角形 AABB：先在加载时算好，castRay 用它做 slab 预筛
+    const ax = data[i * 9]!, ay = data[i * 9 + 1]!, az = data[i * 9 + 2]!;
+    const bx = data[i * 9 + 3]!, by = data[i * 9 + 4]!, bz = data[i * 9 + 5]!;
+    const cx = data[i * 9 + 6]!, cy = data[i * 9 + 7]!, cz = data[i * 9 + 8]!;
+    bounds[bbase] = Math.min(ax, bx, cx);
+    bounds[bbase + 1] = Math.min(ay, by, cy);
+    bounds[bbase + 2] = Math.min(az, bz, cz);
+    bounds[bbase + 3] = Math.max(ax, bx, cx);
+    bounds[bbase + 4] = Math.max(ay, by, cy);
+    bounds[bbase + 5] = Math.max(az, bz, cz);
   }
-  return { data, min, max };
+  return { data, bounds, min, max };
 }
 
 /** Möller–Trumbore 求交，返回按距离排序、去重后的命中列表。 */
@@ -423,8 +446,42 @@ function castRay(mesh: TriangleSoup, origin: Vec3, dir: Vec3, maxT: number): Hit
   const [ox, oy, oz] = origin;
   const [dx, dy, dz] = dir;
   const t = mesh.data;
+  const b = mesh.bounds;
 
   for (let i = 0; i < t.length; i += 9) {
+    // slab 预筛：三角形 AABB 与射线不相交就跳过，省掉大半 Möller–Trumbore 全量计算
+    const bi = (i / 9) * 6;
+    let tmin = 0;
+    let tmax = maxT;
+    let hit = true;
+    for (let axis = 0; axis < 3; axis += 1) {
+      const o = axis === 0 ? ox : axis === 1 ? oy : oz;
+      const d = axis === 0 ? dx : axis === 1 ? dy : dz;
+      const lo = b[bi + axis]!;
+      const hi = b[bi + axis + 3]!;
+      if (Math.abs(d) < 1e-12) {
+        if (o < lo || o > hi) {
+          hit = false;
+          break;
+        }
+      } else {
+        let t1 = (lo - o) / d;
+        let t2 = (hi - o) / d;
+        if (t1 > t2) {
+          const tmp = t1;
+          t1 = t2;
+          t2 = tmp;
+        }
+        if (t1 > tmin) tmin = t1;
+        if (t2 < tmax) tmax = t2;
+        if (tmin > tmax) {
+          hit = false;
+          break;
+        }
+      }
+    }
+    if (!hit) continue;
+
     const ax = t[i]!;
     const ay = t[i + 1]!;
     const az = t[i + 2]!;

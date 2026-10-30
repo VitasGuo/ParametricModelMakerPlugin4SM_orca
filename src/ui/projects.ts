@@ -12,7 +12,7 @@ import { button, clear, drawer, el } from './dom.js';
 import { toast, confirmBar } from './toast.js';
 
 export function openProjectsPanel(
-  current: ProjectState,
+  getCurrent: () => ProjectState,
   onLoad: (project: ProjectState) => void
 ): void {
   const list = el('div', 'project-list');
@@ -24,11 +24,12 @@ export function openProjectsPanel(
   const body = el('div', 'drawer-body', [
     el('div', 'example-toolbar', [
       button('保存当前项目', 'btn btn-accent', () => {
-        saveProject(current);
+        // 抽屉打开期间用户可能继续编辑，保存/导出必须取实时项目
+        saveProject(getCurrent());
         toast('项目已保存到本机');
         render();
       }),
-      button('导出项目 JSON', 'btn', () => downloadProjectJson(current)),
+      button('导出项目 JSON', 'btn', () => downloadProjectJson(getCurrent())),
       button('导入项目 JSON', 'btn', () => fileInput.click()),
     ]),
     list,

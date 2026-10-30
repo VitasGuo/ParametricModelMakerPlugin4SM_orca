@@ -49,16 +49,21 @@ const server = http.createServer((req, res) => {
 
   const chunks = [];
   let size = 0;
+  let tooLarge = false;
   req.on('data', (chunk) => {
     size += chunk.length;
+    if (tooLarge) return;
     if (size > 2_000_000) {
-      req.destroy();
+      tooLarge = true;
+      // 先回 413，等响应写完再断开 socket；先销毁 socket 客户端会收不到响应
       json(res, 413, { error: 'Request too large' });
+      res.on('finish', () => req.destroy());
       return;
     }
     chunks.push(chunk);
   });
   req.on('end', () => {
+    if (tooLarge) return;
     let payload;
     try {
       payload = JSON.parse(Buffer.concat(chunks).toString('utf8'));
@@ -97,6 +102,14 @@ const server = http.createServer((req, res) => {
         headers: outgoing,
       },
       (upstreamRes) => {
+        // 上游流中途出错（连接被重置等）不能成为未捕获 'error' 事件，否则 Node 进程直接崩溃
+        upstreamRes.on('error', (error) => {
+          if (res.headersSent) {
+            res.destroy();
+            return;
+          }
+          json(res, 502, { error: `Upstream error: ${error.message}` });
+        });
         // 上游（如 SenseNova）自己也会带 ACAO；与本地 CORS 头重复会让浏览器判定非法
         const responseHeaders = {};
         for (const [key, value] of Object.entries(upstreamRes.headers)) {
@@ -110,7 +123,13 @@ const server = http.createServer((req, res) => {
         upstreamRes.pipe(res);
       }
     );
+    // 连接与响应空闲总超时：destroy 带 Error 会触发下方 error 处理，返回 502
+    upstream.setTimeout(60_000, () => upstream.destroy(new Error('Upstream timeout')));
     upstream.on('error', (error) => {
+      if (res.headersSent) {
+        res.destroy();
+        return;
+      }
       json(res, 502, { error: `Upstream error: ${error.message}` });
     });
     upstream.end(body);

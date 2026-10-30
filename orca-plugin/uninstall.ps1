@@ -57,9 +57,19 @@ Write-Host "Orca：$OrcaPath" -ForegroundColor DarkGray
 
 $wasRunning = @(Get-Process snapmaker-orca -ErrorAction SilentlyContinue).Count -gt 0
 if (Test-Path $Backup) {
-  Copy-Item $Backup $Index -Force
-  Remove-Item $Backup -Force
-  Write-Host 'index.html 已从备份恢复。' -ForegroundColor Green
+  # 恢复前先确认当前 index.html 仍是插件注入过的版本：Orca 升级覆盖后，旧备份反而会回写旧版页面
+  $currentIndex = ''
+  if (Test-Path $Index) {
+    $currentIndex = [System.IO.File]::ReadAllText($Index, [System.Text.Encoding]::UTF8)
+  }
+  if ($currentIndex.Contains($Marker) -or $currentIndex.Contains($OldMarker)) {
+    Copy-Item $Backup $Index -Force
+    Remove-Item $Backup -Force
+    Write-Host 'index.html 已从备份恢复。' -ForegroundColor Green
+  } else {
+    Remove-Item $Backup -Force
+    Write-Host '当前 index.html 已不含插件注入（可能被 Orca 升级覆盖），跳过恢复，仅删除备份文件。' -ForegroundColor Yellow
+  }
 } elseif (Test-Path $Index) {
   $html = [System.IO.File]::ReadAllText($Index, [System.Text.Encoding]::UTF8)
   $changed = $false

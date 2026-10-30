@@ -28,9 +28,17 @@ let requestSeq = 0;
 export function compile(req: CompileRequest): Promise<CompileResult> {
   const id = ++requestSeq;
   const timeoutMs = req.timeoutMs ?? 20_000;
-  const worker = new Worker(new URL('./openscad.worker.ts', import.meta.url), { type: 'module' });
 
   return new Promise<CompileResult>((resolve, reject) => {
+    let worker: Worker;
+    try {
+      worker = new Worker(new URL('./openscad.worker.ts', import.meta.url), { type: 'module' });
+    } catch (e) {
+      // CSP 或环境禁用 Worker 时也会走到这里，必须 reject 而不是同步 throw
+      reject(new CompileCrashError(e instanceof Error ? e.message : String(e)));
+      return;
+    }
+
     let settled = false;
     const finish = (fn: () => void) => {
       if (settled) return;
@@ -71,27 +79,36 @@ export function compile(req: CompileRequest): Promise<CompileResult> {
       finish(() => reject(new CompileCrashError('Worker 返回数据无法反序列化')));
     };
 
+    // 字体 buffer 复制后 transfer：避免每次编译对几 MB 的 CJK 字体做结构化克隆
+    const transfer: Transferable[] = [];
+    const fonts = req.fonts?.map((font) => {
+      const data = font.data.slice(0);
+      transfer.push(data);
+      return { ...font, data };
+    });
     const message: WorkerRequest = {
       id,
       source: req.source,
       defines: req.defines,
       format: req.format,
-      fonts: req.fonts,
+      fonts,
     };
-    worker.postMessage(message);
+    worker.postMessage(message, transfer);
   });
 }
 
-/** 批量编译（用于变体画廊），默认并发 2。 */
+/** 批量编译（用于变体画廊），默认并发 2；isAborted 返回 true 时停止领取剩余任务。 */
 export async function compileBatch(
   requests: CompileRequest[],
-  concurrency = 2
+  concurrency = 2,
+  isAborted: () => boolean = () => false
 ): Promise<Array<CompileResult | Error>> {
   const results: Array<CompileResult | Error> = new Array(requests.length);
   let next = 0;
 
   async function run(): Promise<void> {
     while (next < requests.length) {
+      if (isAborted()) return;
       const index = next++;
       const req = requests[index]!;
       try {

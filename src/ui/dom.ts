@@ -71,6 +71,9 @@ export interface DrawerOptions {
   width?: number;
 }
 
+/** 活动抽屉栈：Esc 只关最上层，避免一次全关。 */
+const drawerStack: Array<{ close: () => void }> = [];
+
 /**
  * 侧边抽屉：贴边滑入的全高面板，替代居中浮窗。
  * 点击面板外或按 Esc 关闭；body 自行使用 `drawer-body` 类负责滚动。
@@ -95,14 +98,23 @@ export function drawer(
   if (options.width) sheet.style.width = `min(${options.width}px, 94vw)`;
   overlay.appendChild(sheet);
 
+  let closed = false;
+
   function close(): void {
+    if (closed) return; // 幂等：防止重复触发 onClose
+    closed = true;
+    const index = drawerStack.indexOf(self);
+    if (index !== -1) drawerStack.splice(index, 1);
     overlay.remove();
     document.removeEventListener('keydown', onKey);
     onClose();
   }
 
+  const self = { root: overlay, close };
+
   function onKey(e: KeyboardEvent): void {
-    if (e.key === 'Escape') close();
+    // 多层抽屉叠开时只响应最上层
+    if (e.key === 'Escape' && drawerStack[drawerStack.length - 1] === self) close();
   }
 
   overlay.addEventListener('click', (e) => {
@@ -110,5 +122,6 @@ export function drawer(
   });
   document.addEventListener('keydown', onKey);
   document.body.appendChild(overlay);
-  return { root: overlay, close };
+  drawerStack.push(self);
+  return self;
 }

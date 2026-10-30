@@ -170,3 +170,22 @@ describe('injectParams / formatValue', () => {
     expect(out.startsWith('length = 100;')).toBe(true);
   });
 });
+
+describe('beta.9 修复回归（scad-parser）', () => {
+  it('字符串里的分号不再截断赋值行', () => {
+    const r = parseCustomizer(`name = "a;b";\ncode = "x=1;y=2";\n`);
+    expect(r.params[0]).toMatchObject({ name: 'name', default: 'a;b' });
+    expect(r.params[1]).toMatchObject({ name: 'code', default: 'x=1;y=2' });
+  });
+
+  it('以 color 结尾的普通描述不再误判成取色器', () => {
+    const r = parseCustomizer(`size = 30; // base color\n`);
+    expect(r.params[0]!.control).toEqual({ kind: 'plain' });
+  });
+
+  it('整条注释恰好是 color/font 时仍是特殊控件', () => {
+    const r = parseCustomizer(`bodyColor = "#FF0000"; // color\nfont = "Arial"; // font\n`);
+    expect(r.params[0]!.control).toEqual({ kind: 'color' });
+    expect(r.params[1]!.control).toEqual({ kind: 'font' });
+  });
+});

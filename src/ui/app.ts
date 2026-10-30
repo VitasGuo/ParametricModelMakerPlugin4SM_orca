@@ -73,8 +73,8 @@ export class App {
     // ---------- topbar（macOS 风格：左侧菜单 / 居中标题 / 右侧状态） ----------
     this.projectName = el('input', 'project-name');
     this.projectName.value = this.store.state.project.name;
+    // change 已覆盖 Enter 与失焦两种提交，blur 会造成双重 rename
     this.projectName.addEventListener('change', () => this.store.renameProject(this.projectName.value));
-    this.projectName.addEventListener('blur', () => this.store.renameProject(this.projectName.value));
 
     this.statusBadge = el('span', 'badge', ['等待生成']);
     this.configBadge = el('button', 'badge err', ['未配置模型']);
@@ -360,6 +360,8 @@ export class App {
     this.codeTab.classList.toggle('active', state.codeOpen);
     this.codePane.classList.toggle('hidden', !state.codeOpen);
     this.viewerEl.classList.toggle('pane-hidden', state.codeOpen);
+    // 源码页签遮挡预览时暂停 rAF 渲染循环，省电省 GPU
+    this.viewer.setVisible(!state.codeOpen);
     if (state.codeOpen && !this.codeWasOpen) {
       requestAnimationFrame(() => this.editor.requestMeasure());
     }
@@ -452,10 +454,10 @@ export class App {
     if (reroll) {
       this.store.addChat({ role: 'system', text: '按验证反馈重抽…' });
     } else {
-      this.store.addChat({ role: 'user', text: userMessage, images: thumbs });
+      const entryId = this.store.addChat({ role: 'user', text: userMessage, images: thumbs });
       if (images.length > 0) {
-        // 按原始用户消息缓存原图，供"重抽"复用；只留最近 10 条，避免大图常驻内存
-        this.chatImages.set(userMessage, images);
+        // 原图按聊天条目 id 缓存，供"重抽"复用；只留最近 10 条，避免大图常驻内存
+        this.chatImages.set(entryId, images);
         while (this.chatImages.size > 10) {
           const oldest = this.chatImages.keys().next().value;
           if (oldest === undefined) break;
@@ -464,6 +466,8 @@ export class App {
       }
     }
     this.store.setAiBusy(true);
+    // 代际守卫：await 期间新建/载入项目后，响应不能写进新项目（与编译的 generation 机制对等）
+    const projectId = this.store.state.project.id;
 
     try {
       const source = this.store.state.project.source;
@@ -491,6 +495,10 @@ export class App {
         `${response.action?.type ?? 'error'} · ${Math.round(performance.now() - started)} ms · ` +
           `${response.verification?.status ?? '未验证'}`
       );
+      if (this.store.state.project.id !== projectId) {
+        logger.warn('ai', 'AI 响应已丢弃', '生成期间切换了项目');
+        return;
+      }
       this.appendAiResponse(response);
       this.applyAction(response);
     } catch (e) {
@@ -574,9 +582,15 @@ export class App {
   }
 
   private handleReroll(entry: ChatEntry): void {
+    if (this.store.state.aiBusy) return;
     if (!entry.rerollContext) return;
-    const images = this.chatImages.get(entry.rerollContext.userMessage) ?? [];
-    void this.runAi(entry.rerollContext.userMessage, entry.rerollContext, images);
+    // 原图缓存在发起请求的那条 user 消息的 id 上（取最近的同文本 user 条目）
+    const userMessage = entry.rerollContext.userMessage;
+    const userEntry = [...this.store.state.project.chat]
+      .reverse()
+      .find((m) => m.role === 'user' && m.text === userMessage);
+    const images = userEntry ? (this.chatImages.get(userEntry.id) ?? []) : [];
+    void this.runAi(userMessage, entry.rerollContext, images);
   }
 
   private openSettings(): void {
@@ -612,12 +626,16 @@ export class App {
   }
 
   private openProjects(): void {
-    openProjectsPanel(this.store.state.project, (project) => {
-      this.store.loadProject(project);
-      this.lastOutput = null;
-      this.viewer.clearModel();
-      toast(`已打开「${project.name}」`);
-    });
+    // 传 getter 而不是快照：抽屉打开期间继续编辑时，保存/导出必须取最新项目
+    openProjectsPanel(
+      () => this.store.state.project,
+      (project) => {
+        this.store.loadProject(project);
+        this.lastOutput = null;
+        this.viewer.clearModel();
+        toast(`已打开「${project.name}」`);
+      }
+    );
   }
 
   private saveCurrent(): void {

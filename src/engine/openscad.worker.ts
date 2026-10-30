@@ -35,8 +35,18 @@ ctx.onmessage = async (event: MessageEvent<WorkerRequest>) => {
     if (/\btext\s*\(/.test(req.source)) {
       const { addFonts } = await import('@lofcz/openscad-wasm/fonts');
       addFonts(instance);
+      // 中文字体名只把 ASCII 词字符以外的字符替换掉会互相坍缩，改为只过滤路径/控制字符并去重
+      const usedNames = new Set<string>();
       for (const font of req.fonts ?? []) {
-        instance.FS.writeFile(`/fonts/${sanitizeFileName(font.name)}`, new Uint8Array(font.data));
+        let name = sanitizeFileName(font.name);
+        let suffix = 1;
+        while (usedNames.has(name.toLowerCase())) {
+          const dot = name.lastIndexOf('.');
+          name = dot > 0 ? `${name.slice(0, dot)}_${suffix}${name.slice(dot)}` : `${name}_${suffix}`;
+          suffix += 1;
+        }
+        usedNames.add(name.toLowerCase());
+        instance.FS.writeFile(`/fonts/${name}`, new Uint8Array(font.data));
       }
     }
 
@@ -102,6 +112,8 @@ ctx.onmessage = async (event: MessageEvent<WorkerRequest>) => {
   }
 };
 
+/** 只过滤路径分隔符与控制字符：中文字体名必须原样保留，否则多个中文字体坍缩成同名互相覆盖。 */
 function sanitizeFileName(name: string): string {
-  return name.replace(/[^\w.\-]/g, '_');
+  const cleaned = name.replace(/[\\/:*?"<>|\u0000-\u001F]/g, '_').trim();
+  return cleaned || 'font.ttf';
 }

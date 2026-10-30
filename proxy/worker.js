@@ -41,7 +41,7 @@ export default {
     const cors = {
       'Access-Control-Allow-Origin': origin,
       'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Headers': 'Content-Type, X-Proxy-Token',
       'Access-Control-Max-Age': '86400',
       Vary: 'Origin',
     };
@@ -51,6 +51,14 @@ export default {
     }
     if (request.method !== 'POST') {
       return json({ error: '只支持 POST' }, 405, cors);
+    }
+
+    // 可选共享密钥：设置了 PROXY_TOKEN 时必须携带相等的 x-proxy-token 请求头；为空则不校验（向后兼容）
+    if (env.PROXY_TOKEN) {
+      const token = request.headers.get('x-proxy-token');
+      if (token !== env.PROXY_TOKEN) {
+        return json({ error: '缺少或错误的 x-proxy-token' }, 401, cors);
+      }
     }
 
     let payload;

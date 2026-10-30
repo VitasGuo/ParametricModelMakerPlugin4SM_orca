@@ -155,10 +155,41 @@ export async function callProvider(
     throw new ProviderError('自定义 provider 需要填写 Base URL。');
   }
 
+  // 失败轮次会产生空文本的 assistant 消息；空 content 会被 Claude / 部分兼容端点拒绝
+  const safeHistory = history.filter((m) => m.content.trim().length > 0);
+
   if (cfg.provider === 'claude') {
-    return callClaude(cfg, system, userText, images, temperature, history);
+    return callClaude(cfg, system, userText, images, temperature, safeHistory);
   }
-  return callOpenAICompatible(cfg, system, userText, images, temperature, history);
+  return callOpenAICompatible(cfg, system, userText, images, temperature, safeHistory);
+}
+
+/**
+ * Claude /v1/messages 要求首条为 user；相邻同角色旧版 API 会因不交替直接 400。
+ * 在"history + 当前消息"拼完之后统一合并（reroll 场景尾部会出现连续 user）。
+ */
+function normalizeClaudeTurns(
+  messages: Array<{ role: 'user' | 'assistant'; content: ClaudeContent[] }>
+): Array<{ role: 'user' | 'assistant'; content: ClaudeContent[] }> {
+  const merged: Array<{ role: 'user' | 'assistant'; content: ClaudeContent[] }> = [];
+  for (const m of messages) {
+    if (m.content.length === 0) continue;
+    const last = merged[merged.length - 1];
+    if (last && last.role === m.role) {
+      last.content = [...last.content, ...m.content];
+    } else {
+      merged.push({ role: m.role, content: [...m.content] });
+    }
+  }
+  while (merged.length > 0 && merged[0]!.role !== 'user') merged.shift();
+  return merged;
+}
+
+/** 字符串版便捷封装（单测与调试用）。 */
+export function normalizeClaudeHistory(history: ChatMessage[]): ChatMessage[] {
+  return normalizeClaudeTurns(
+    history.map((m) => ({ role: m.role, content: [{ type: 'text' as const, text: m.content }] }))
+  ).map((m) => ({ role: m.role, content: m.content.map((b) => b.text ?? '').join('\n\n') }));
 }
 
 interface ContentBlock {
@@ -257,10 +288,10 @@ async function callClaude(
     });
   }
 
-  const messages = [
-    ...history.map((m) => ({ role: m.role, content: m.content })),
+  const messages = normalizeClaudeTurns([
+    ...history.map((m) => ({ role: m.role, content: [{ type: 'text' as const, text: m.content }] })),
     { role: 'user' as const, content: userContent },
-  ];
+  ]);
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',

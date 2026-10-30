@@ -5,3 +5,6 @@ compatibility_date = "2026-10-01"
 [vars]
 # 建议改成你的网页域名，例如 "https://model-lab.example.com"
 ALLOW_ORIGIN = "*"
+# 部署到公网前务必设置随机 token，否则任何人都能拿你的部署当免费中继；
+# 设置后，请求必须携带同名请求头 x-proxy-token（值为该 token），留空则不校验
+PROXY_TOKEN = ""

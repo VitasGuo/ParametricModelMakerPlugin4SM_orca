@@ -72,6 +72,7 @@ export function serializeDefineValue(value: ParamValue, param?: ScadParam): stri
 
   const text = String(value);
   if (isQuoted(text)) return text;
+  if (/^'/.test(text.trim())) return quote(stripSingleQuotes(text.trim()));
 
   const control = param?.control.kind;
   if (control === 'enum' || control === 'color' || control === 'font') {
@@ -88,8 +89,17 @@ export function serializeDefineValue(value: ParamValue, param?: ScadParam): stri
   return quote(text);
 }
 
+/** 只有双引号是 OpenSCAD 合法字符串；单引号不是引号，剥掉后重新加双引号。 */
 function isQuoted(text: string): boolean {
-  return /^"([^"\\]|\\.)*"$/.test(text) || /^'([^'\\]|\\.)*'$/.test(text);
+  return /^"([^"\\]|\\.)*"$/.test(text);
+}
+
+/** 剥掉成对的单引号（OpenSCAD 不支持单引号字符串）。 */
+function stripSingleQuotes(text: string): string {
+  if (/^'([^'\\]|\\.)*'$/.test(text)) {
+    return text.slice(1, -1).replace(/\\(['\\])/g, '$1');
+  }
+  return text;
 }
 
 function quote(text: string): string {

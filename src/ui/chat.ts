@@ -37,6 +37,8 @@ export class ChatPanel {
   private readonly attachRow: HTMLElement;
   private pending: PendingImage[] = [];
   private signature = '';
+  /** 当前已渲染的消息条数（增量渲染用）。 */
+  private renderedCount = 0;
 
   constructor(options: ChatPanelOptions) {
     this.store = options.store;
@@ -120,14 +122,31 @@ export class ChatPanel {
       )
       .join('|');
     if (signature !== this.signature) {
+      // 前缀一致时只追加新条目，长对话不再整列重建
+      const oldCount = this.signature ? this.signature.split('|').length : 0;
+      const appendOnly =
+        oldCount > 0 &&
+        signature.startsWith(`${this.signature}|`) &&
+        this.renderedCount === oldCount;
+      if (appendOnly) {
+        for (const entry of state.project.chat.slice(this.renderedCount)) {
+          this.messagesEl.appendChild(this.renderEntry(entry));
+        }
+      } else {
+        this.renderMessages(state.project.chat);
+      }
+      this.renderedCount = state.project.chat.length;
       this.signature = signature;
-      this.renderMessages(state.project.chat);
       this.scrollToBottom();
     }
     this.sendButton.disabled = state.aiBusy;
     this.composer.disabled = state.aiBusy;
     this.attachButton.disabled = state.aiBusy;
     this.sendButton.textContent = state.aiBusy ? '思考中…' : '发送';
+    // 重抽按钮不随 aiBusy 触发重建，这里统一启停
+    for (const buttonEl of this.messagesEl.querySelectorAll<HTMLButtonElement>('.msg-tools button')) {
+      buttonEl.disabled = state.aiBusy;
+    }
   }
 
   focusComposer(): void {
@@ -147,6 +166,8 @@ export class ChatPanel {
     for (const file of list.slice(0, room)) {
       void compressImage(file)
         .then((image) => {
+          // 压缩期间可能又添加了图片：push 前复查上限，避免异步竞态突破 3 张
+          if (this.pending.length >= MAX_IMAGES) return;
           this.pending.push(image);
           this.renderAttachments();
         })

@@ -7,7 +7,7 @@
 **仓库 / Repository**: https://github.com/VitasGuo/ParametricModelMakerPlugin4SM_orca<br>
 **开发者 / Developer**: VitasGuo · **许可证 / License**: [GPL-2.0-only](LICENSE)
 
-> **Beta 预览版 / Beta preview — v0.7.0-beta.8**
+> **Beta 预览版 / Beta preview — v0.7.0-beta.9**
 > 核心建模链路与 67 个范例已通过真实引擎 + 结构审计回归；插件安装脚本与各家 AI Provider 的兼容性仍在收集反馈，接口和范例可能继续调整。
 > The core modeling pipeline and all 67 examples pass real-engine and mesh-audit regression. The installer and provider compatibility are still collecting feedback; APIs and examples may change.
 

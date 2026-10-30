@@ -296,6 +296,8 @@ let translating = false;
 const textOriginals = new WeakMap<Text, string>();
 const attrOriginals = new WeakMap<Element, Record<string, string>>();
 const selfWrites = new WeakSet<Node>();
+/** i18n 自己写的属性（element → attr 名集合），防止 attributes 观察死循环。 */
+const selfAttrWrites = new WeakMap<Element, Set<string>>();
 
 export function getLang(): Lang {
   return lang;
@@ -355,10 +357,26 @@ export function setupI18n(): void {
             translateTree(node);
           }
         }
+      } else if (record.type === 'attributes') {
+        // 程序化 setAttribute 的 title/placeholder 也要跟上语言切换
+        const element = record.target as Element;
+        const attr = record.attributeName;
+        if (!attr) continue;
+        const mine = selfAttrWrites.get(element);
+        if (mine?.has(attr)) {
+          mine.delete(attr);
+          continue;
+        }
+        translateAttributes(element);
       }
     }
   });
-  observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true,
+    characterData: true,
+    attributeFilter: ['title', 'placeholder', 'aria-label', 'alt'],
+  });
 }
 
 function applyTranslations(): void {
@@ -422,14 +440,35 @@ function translateAttributes(element: Element): void {
       originals = {};
       attrOriginals.set(element, originals);
     }
-    if (!(attr in originals)) originals[attr] = value;
+    const original = originals[attr];
+    if (original === undefined) {
+      originals[attr] = value;
+    } else if (value !== original && value !== translateString(original)) {
+      // 程序写入的新动态文案（如状态徽章 title）：以它为新基线，避免被旧基线回退覆盖
+      originals[attr] = value;
+    }
     if (lang === 'zh') {
-      if (value !== originals[attr]) element.setAttribute(attr, originals[attr]!);
+      // 中文是源语言：只有当前值是自己翻译出的英文时才回退到基线
+      const current = element.getAttribute(attr)!;
+      if (current !== originals[attr] && current === translateString(originals[attr]!)) {
+        setAttr(element, attr, originals[attr]!);
+      }
       continue;
     }
     const translated = translateString(value);
-    if (translated !== value) element.setAttribute(attr, translated);
+    if (translated !== value) setAttr(element, attr, translated);
   }
+}
+
+function setAttr(element: Element, attr: string, value: string): void {
+  if (element.getAttribute(attr) === value) return;
+  let mine = selfAttrWrites.get(element);
+  if (!mine) {
+    mine = new Set();
+    selfAttrWrites.set(element, mine);
+  }
+  mine.add(attr);
+  element.setAttribute(attr, value);
 }
 
 function shouldSkip(element: Element): boolean {

@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { buildSystemPrompt, buildUserContext, parseAiOutput, OUTPUT_SCHEMA } from '../src/core/prompts.js';
+import { buildSystemPrompt, buildUserContext, extractBalancedJson, parseAiOutput, OUTPUT_SCHEMA } from '../src/core/prompts.js';
 import { EXAMPLES, PROMPT_FULL_IDS, examplesToPromptText, getExample } from '../src/core/examples.js';
 import type { EditorState } from '../src/core/types.js';
 
@@ -132,5 +132,21 @@ describe('parseAiOutput', () => {
 
   it('action 不是对象抛错', () => {
     expect(() => parseAiOutput('{"action":"not-object"}')).toThrow(/action/);
+  });
+});
+
+describe('parseAiOutput：混入说明文字（beta.9）', () => {
+  it('JSON 前后有说明文字时回退提取平衡对象', () => {
+    const raw =
+      '好的，这是结果：\n{"action":{"type":"explain","text":"你好"},"narration":"n"}\n以上就是结果。';
+    const parsed = parseAiOutput(raw);
+    expect(parsed.action).toEqual({ type: 'explain', text: '你好' });
+    expect(parsed.narration).toBe('n');
+  });
+
+  it('extractBalancedJson 对字符串里的花括号免疫', () => {
+    expect(extractBalancedJson('前缀 {"a":"}{","b":{"c":1}} 后缀')).toBe('{"a":"}{","b":{"c":1}}');
+    expect(extractBalancedJson('没有对象')).toBeNull();
+    expect(extractBalancedJson('{"未闭合"')).toBeNull();
   });
 });

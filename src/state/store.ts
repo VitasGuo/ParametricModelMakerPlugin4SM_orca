@@ -49,10 +49,7 @@ export interface AppState {
   compiling: boolean;
   compileError: string | null;
   codeOpen: boolean;
-  examplesOpen: boolean;
-  settingsOpen: boolean;
   aiBusy: boolean;
-  lastAiMessage: string | null;
 }
 
 type Listener = (state: AppState) => void;
@@ -106,10 +103,7 @@ export class Store {
       compiling: false,
       compileError: null,
       codeOpen: false,
-      examplesOpen: false,
-      settingsOpen: false,
       aiBusy: false,
-      lastAiMessage: null,
     };
     this.scheduleCompile(0);
   }
@@ -168,9 +162,26 @@ export class Store {
     this.scheduleCompile();
   }
 
-  /** 外部动作（AI replaceSource / 范例载入）。 */
+  /**
+   * 外部整块替换源码（AI replaceSource / 载入范例 / 图片生成）。
+   * 与 setSource 不同：参数值重置为新源码的默认值——
+   * 新模型有自己的尺寸体系，沿用上个项目的同名旧值会静默覆盖设计意图。
+   */
   replaceSource(source: string): void {
-    this.setSource(source);
+    const parsed = parseCustomizer(source);
+    this.state = {
+      ...this.state,
+      project: {
+        ...this.state.project,
+        source,
+        paramValues: valuesFromParams(parsed.params),
+        updatedAt: Date.now(),
+      },
+      params: parsed.params,
+      hiddenGroups: parsed.hiddenGroups,
+    };
+    this.emit();
+    this.scheduleCompile();
   }
 
   renameProject(name: string): void {
@@ -183,12 +194,6 @@ export class Store {
     return id;
   }
 
-  updateChat(id: string, patch: Partial<ChatEntry>): void {
-    this.patchProject({
-      chat: this.state.project.chat.map((m) => (m.id === id ? { ...m, ...patch } : m)),
-    });
-  }
-
   clearChat(): void {
     this.patchProject({ chat: [] });
   }
@@ -197,24 +202,8 @@ export class Store {
     this.patch({ codeOpen: open });
   }
 
-  toggleCode(): void {
-    this.patch({ codeOpen: !this.state.codeOpen });
-  }
-
-  setExamplesOpen(open: boolean): void {
-    this.patch({ examplesOpen: open });
-  }
-
-  setSettingsOpen(open: boolean): void {
-    this.patch({ settingsOpen: open });
-  }
-
   setAiBusy(busy: boolean): void {
     this.patch({ aiBusy: busy });
-  }
-
-  setLastAiMessage(message: string | null): void {
-    this.patch({ lastAiMessage: message });
   }
 
   newProject(): void {
@@ -346,10 +335,14 @@ export class Store {
     }
   }
 
-  /** AI 历史：只保留 user/assistant 文本。 */
+  /** AI 历史：只保留 user/assistant 文本；空文本的失败轮次不进 history。 */
   aiHistory(): ChatMessage[] {
     return this.state.project.chat
-      .filter((m) => m.role === 'user' || m.role === 'assistant')
+      .filter(
+        (m) =>
+          (m.role === 'user' || m.role === 'assistant') &&
+          !(m.role === 'assistant' && !m.text.trim())
+      )
       .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.text }))
       .slice(-10);
   }

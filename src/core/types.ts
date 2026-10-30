@@ -1,8 +1,8 @@
 /**
  * 全局类型定义。
  *
- * 设计原则：消息载荷用纯数据结构，不携带函数、不依赖 chrome API，
- * 便于在 Node 环境单测、在 Side Panel / Background / Content Script 三端共享。
+ * 设计原则：消息载荷用纯数据结构，不携带函数、不依赖浏览器 API，
+ * 便于在 Node 环境单测。
  */
 
 import type { PartCheck } from './part-spec.js';
@@ -45,9 +45,9 @@ export interface ScadCustomization {
   hiddenGroups: string[];
 }
 
-/** 编辑器当前状态快照，由 Content Script 采集。 */
+/** 编辑器当前状态快照。 */
 export interface EditorState {
-  /** 当前 .scad 源码（可能从 DOM/React state/网络拦截获取）。 */
+  /** 当前 .scad 源码。 */
   scadSource: string;
   /** 当前参数值（变量名 → 值）。 */
   paramValues: Record<string, string | number | boolean>;
@@ -170,7 +170,7 @@ export interface ModelConfig {
   /**
    * 思考力度（可选，仅部分服务商支持，如 SenseNova）。
    * 默认 'none'（关思考）：结构化 JSON 输出场景下思考会挤占 max_tokens
-   * 导致 content 为空（traps.md #4）。想启用思考选 low/medium/high。
+   * 导致 content 为空。想启用思考选 low/medium/high。
    */
   reasoningEffort?: 'none' | 'low' | 'medium' | 'high';
 }

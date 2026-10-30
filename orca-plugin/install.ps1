@@ -35,8 +35,9 @@ if (-not (Test-Admin)) {
     $argList += @('-OrcaPath', ('"' + $OrcaPath + '"'))
   }
   if ($NoPause) { $argList += '-NoPause' }
-  Start-Process -FilePath 'powershell.exe' -Verb RunAs -ArgumentList $argList -Wait
-  exit 0
+  $proc = Start-Process -FilePath 'powershell.exe' -Verb RunAs -ArgumentList $argList -Wait -PassThru
+  # 透传提权子进程的退出码：install.bat 的 if errorlevel 1 pause 依赖非零退出码
+  exit $proc.ExitCode
 }
 
 $RepoRoot = Split-Path -Parent $PSScriptRoot

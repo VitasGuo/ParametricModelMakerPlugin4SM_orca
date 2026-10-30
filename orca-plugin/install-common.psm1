@@ -130,12 +130,20 @@ WshShell.Run """$NodePath"" ""$proxyPath""", 0, False
 
     $listening = Get-NetTCPConnection -LocalPort 17329 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($listening) {
-        # 端口被开发用的旧进程占用时，换成本机安装副本，保证开机启动项与运行进程一致
+        # 只有本插件的代理进程（命令行含 local-proxy.mjs）才允许停止，其它占用者不误杀
         $proc = Get-CimInstance Win32_Process -Filter "ProcessId=$($listening.OwningProcess)" -ErrorAction SilentlyContinue
-        if (-not $proc -or $proc.CommandLine -notlike "*$proxyPath*") {
+        $isProxy = $false
+        if ($proc -and $proc.CommandLine -like '*local-proxy.mjs*') {
+            $isProxy = $true
+        }
+        if ($isProxy) {
             Stop-Process -Id $listening.OwningProcess -Force -ErrorAction SilentlyContinue
             Start-Sleep -Milliseconds 500
             $listening = $null
+        } else {
+            $ownerName = '未知进程'
+            if ($proc) { $ownerName = $proc.Name }
+            throw "端口 17329 已被其它程序占用：$ownerName（PID $($listening.OwningProcess)），请手动处理后重试安装。"
         }
     }
     if (-not $listening) {
@@ -155,8 +163,16 @@ WshShell.Run """$NodePath"" ""$proxyPath""", 0, False
 function Stop-LocalProxy {
     $listening = Get-NetTCPConnection -LocalPort 17329 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($listening) {
-        Stop-Process -Id $listening.OwningProcess -Force -ErrorAction SilentlyContinue
-        Start-Sleep -Milliseconds 500
+        # 只有本插件的代理进程（命令行含 local-proxy.mjs）才停止，其它占用者不误杀
+        $proc = Get-CimInstance Win32_Process -Filter "ProcessId=$($listening.OwningProcess)" -ErrorAction SilentlyContinue
+        if ($proc -and $proc.CommandLine -like '*local-proxy.mjs*') {
+            Stop-Process -Id $listening.OwningProcess -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Milliseconds 500
+        } else {
+            $ownerName = '未知进程'
+            if ($proc) { $ownerName = $proc.Name }
+            Write-Host "端口 17329 已被其它程序占用：$ownerName（PID $($listening.OwningProcess)），未停止该进程，请手动处理。" -ForegroundColor Yellow
+        }
     }
     $startup = [Environment]::GetFolderPath('Startup')
     $shortcutPath = Join-Path $startup 'Parametric Model Maker Proxy.lnk'

@@ -734,18 +734,54 @@ export function parseAiOutput(raw: string): {
   raw: string;
 } {
   const cleaned = stripCodeFence(raw).trim();
-  const obj = JSON.parse(cleaned) as {
-    action: AiAction;
-    narration?: string;
-  };
-  if (!obj.action || typeof obj.action !== 'object') {
-    throw new Error('AI 输出缺少 action 字段');
+  // 模型可能在 JSON 前后混入说明文字：直解失败时回退提取第一个平衡的 {...}
+  const candidates = [cleaned, extractBalancedJson(cleaned)];
+  let lastError: unknown = new Error('AI 输出为空');
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    try {
+      const obj = JSON.parse(candidate) as {
+        action: AiAction;
+        narration?: string;
+      };
+      if (!obj.action || typeof obj.action !== 'object') {
+        throw new Error('AI 输出缺少 action 字段');
+      }
+      return {
+        action: obj.action,
+        narration: obj.narration ?? '',
+        raw,
+      };
+    } catch (e) {
+      lastError = e;
+    }
   }
-  return {
-    action: obj.action,
-    narration: obj.narration ?? '',
-    raw,
-  };
+  throw lastError instanceof Error ? lastError : new Error('AI 输出无法解析');
+}
+
+/** 从混合文本里提取第一个括号平衡的 JSON 对象（字符串与转义感知）。找不到返回 null。 */
+export function extractBalancedJson(text: string): string | null {
+  const start = text.indexOf('{');
+  if (start === -1) return null;
+  let depth = 0;
+  let quote = '';
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i]!;
+    if (quote) {
+      if (ch === '\\') i++;
+      else if (ch === quote) quote = '';
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      quote = ch;
+    } else if (ch === '{') {
+      depth++;
+    } else if (ch === '}') {
+      depth--;
+      if (depth === 0) return text.slice(start, i + 1);
+    }
+  }
+  return null;
 }
 
 /** 去除 \`\`\`json ... \`\`\` 或 \`\`\` ... \`\`\` 包裹。 */

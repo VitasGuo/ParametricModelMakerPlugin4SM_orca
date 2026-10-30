@@ -7,20 +7,35 @@
 import type { ProjectState } from '../state/store.js';
 
 const KEY = 'model-lab-web:projects';
+const CORRUPT_BACKUP_KEY = `${KEY}:corrupt-backup`;
 const MAX_PROJECTS = 30;
 
 export function listProjects(): ProjectState[] {
+  let raw: string | null = null;
   try {
-    const raw = localStorage.getItem(KEY);
+    raw = localStorage.getItem(KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as ProjectState[];
-    if (!Array.isArray(parsed)) return [];
+    if (!Array.isArray(parsed)) {
+      backupCorrupt(raw);
+      return [];
+    }
     return parsed
       .filter((p) => p && typeof p.source === 'string')
       .map((p) => ({ ...p, id: p.id || legacyId(p), chat: Array.isArray(p.chat) ? p.chat : [] }))
       .sort((a, b) => b.updatedAt - a.updatedAt);
   } catch {
+    // JSON 损坏：把原文备份后按空列表处理，避免下次保存直接抹掉仅存的证据
+    if (raw) backupCorrupt(raw);
     return [];
+  }
+}
+
+function backupCorrupt(raw: string): void {
+  try {
+    localStorage.setItem(CORRUPT_BACKUP_KEY, raw);
+  } catch {
+    // ignore
   }
 }
 

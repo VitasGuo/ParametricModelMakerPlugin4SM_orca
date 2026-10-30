@@ -40,7 +40,7 @@ export interface CompileResult {
   /** 空模型（真实引擎 exit=0 也可能输出空 STL）。 */
   empty: boolean;
   format: ExportFormat;
-  /** 仅 ok && !empty 时存在。 */
+  /** 输出字节；只要引擎写出了文件就存在（exit≠0 但有产物时同样返回）。 */
   output?: ArrayBuffer;
   summary?: MeshSummary;
   messages: CompileMessage[];

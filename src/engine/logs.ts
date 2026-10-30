@@ -4,10 +4,11 @@ import type { CompileMessage } from './types.js';
 
 /**
  * 正常结束时的统计噪声（含 `Status: NoError`）。
- * 注意 `NoError` 里包含 "error" 子串，不能只做 includes('error')（traps #19）。
+ * 注意 `NoError` 里包含 "error" 子串，不能只做 includes('error')（traps #19）；
+ * CGAL 统计行是噪声，但 `CGAL ERROR: …` 是真实错误，不能吞（用负向先行排除）。
  */
 const NOISE =
-  /^(Geometries in cache|Geometry cache size|CGAL|Rendering|Total rendering time|Simple:|Vertices:|Halfedges:|Edges:|Halffacets:|Facets:|Volumes:|Two volumes will be joined|Volumes supported|PolySets? in cache|Status:\s*NoError)/i;
+  /^(Geometries in cache|Geometry cache size|CGAL(?! ERROR)|Rendering|Total rendering time|Simple:|Vertices:|Halfedges:|Edges:|Halffacets:|Facets:|Volumes:|Two volumes will be joined|Volumes supported|PolySets? in cache|Status:\s*NoError)/i;
 
 export function classifyLogs(lines: string[]): CompileMessage[] {
   const out: CompileMessage[] = [];

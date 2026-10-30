@@ -29,3 +29,15 @@ describe('classifyLogs', () => {
     expect(messages).toHaveLength(0);
   });
 });
+
+describe('classifyLogs：CGAL（beta.9）', () => {
+  it('CGAL ERROR 是真实错误，不再被当噪声吞掉', () => {
+    const messages = classifyLogs(['CGAL ERROR: assertion violation!']);
+    expect(messages).toHaveLength(1);
+    expect(messages[0]!.level).toBe('error');
+  });
+
+  it('CGAL 统计行仍是噪声', () => {
+    expect(classifyLogs(['CGAL Polyhedron_3<std::allocator<int>>'])).toHaveLength(0);
+  });
+});

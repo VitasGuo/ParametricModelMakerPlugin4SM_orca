@@ -117,7 +117,6 @@ export function openImageImportPanel(onGenerate: (scad: string, note: string) =>
       const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
       bitmap.close?.();
       lastSourceData = { width: data.width, height: data.height, data: data.data };
-      grid = gridFromImage(lastSourceData, Number(colsInput.value) || 32, Number(levelsSelect.value) || 3, invertBox.checked);
       fileLabel.textContent = `${file.name} · ${canvas.width}×${canvas.height}px`;
       generateBtn.disabled = false;
       refresh();
@@ -129,13 +128,12 @@ export function openImageImportPanel(onGenerate: (scad: string, note: string) =>
   }
 
   function refresh(): void {
-    if (!grid) return;
-    // 参数变了就重新降采样
     const source = lastSourceData;
     if (!source) return;
     grid = gridFromImage(source, Number(colsInput.value) || 32, Number(levelsSelect.value) || 3, invertBox.checked);
     drawPreview(grid);
-    info.textContent = `${grid.cols} × ${grid.rows} 格 · 预计 ${countParts(grid)} 个实体（含底板）`;
+    // 底板 + 像素块（所有像素都嵌在底板里，连通实体实际是 1 个）
+    info.textContent = `${grid.cols} × ${grid.rows} 格 · 底板 + ${countParts(grid) - 1} 个像素块`;
   }
 
   let lastSourceData: Parameters<typeof gridFromImage>[0] | null = null;

@@ -21,19 +21,34 @@ export interface HistoryEntry {
 }
 
 const KEY = 'model-lab-web:history';
+const CORRUPT_BACKUP_KEY = `${KEY}:corrupt-backup`;
 const MAX_ENTRIES = 60;
 
 export function listHistory(): HistoryEntry[] {
+  let raw: string | null = null;
   try {
-    const raw = localStorage.getItem(KEY);
+    raw = localStorage.getItem(KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as HistoryEntry[];
-    if (!Array.isArray(parsed)) return [];
+    if (!Array.isArray(parsed)) {
+      backupCorrupt(raw);
+      return [];
+    }
     return parsed
       .filter((entry) => entry && typeof entry.source === 'string' && entry.source.trim())
       .sort((a, b) => b.createdAt - a.createdAt);
   } catch {
+    // JSON 损坏：备份原文再按空列表处理，避免下次写入抹掉仅存的证据
+    if (raw) backupCorrupt(raw);
     return [];
+  }
+}
+
+function backupCorrupt(raw: string): void {
+  try {
+    localStorage.setItem(CORRUPT_BACKUP_KEY, raw);
+  } catch {
+    // ignore
   }
 }
 

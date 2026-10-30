@@ -21,6 +21,11 @@ export interface ImageLike {
   data: Uint8ClampedArray;
 }
 
+/** 网格上限：竖长图按宽高比放大行数会无界增长，生成几万格 SCAD 必然编译超时。 */
+const MAX_COLS = 96;
+const MAX_ROWS = 200;
+const MAX_CELLS = 4096;
+
 /**
  * 把一张已解码的图片降采样成像素网格。
  *
@@ -32,9 +37,11 @@ export function gridFromImage(
   levels: number,
   invert = false
 ): PixelGrid {
-  const safeCols = Math.max(4, Math.min(96, Math.round(cols)));
+  const safeCols = Math.max(4, Math.min(MAX_COLS, Math.round(cols)));
   const safeLevels = Math.max(2, Math.min(9, Math.round(levels)));
-  const rows = Math.max(1, Math.round((safeCols * img.height) / Math.max(1, img.width)));
+  const naturalRows = Math.max(1, Math.round((safeCols * img.height) / Math.max(1, img.width)));
+  // 行数受双重上限约束：绝对行数 + 总格数（保列数，砍行数；纵向细节宁可丢也不让编译超时）
+  const rows = Math.max(1, Math.min(MAX_ROWS, naturalRows, Math.floor(MAX_CELLS / safeCols)));
   const cells: number[] = [];
 
   for (let r = 0; r < rows; r++) {
@@ -146,7 +153,7 @@ difference() {
 `;
 }
 
-/** 估算生成模型的实体数（底板 1 个 + 非空白格）。 */
+/** 估算生成模型的图形元素数（底板 1 个 + 非空白格；所有元素都嵌入底板，连通实体仍是 1 个）。 */
 export function countParts(grid: PixelGrid): number {
   return 1 + grid.cells.filter((v) => v > 0).length;
 }

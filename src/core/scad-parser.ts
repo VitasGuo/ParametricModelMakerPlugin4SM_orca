@@ -38,12 +38,68 @@ const GROUP_RE = /\/\*\s*\[([^\]]+)\]\s*\*\//;
 
 /**
  * 匹配顶层变量声明行：`name = value; // optional comment`
- * 捕获组：1=name, 2=value(原始), 3=行尾注释(可选)
+ * 捕获组：1=name。value 与行尾注释由 parseAssignLine 用引号感知的扫描器拆分，
+ * 纯正则 `[^;]+` 会被字符串里的分号（`name = "a;b";`）截断。
  */
-const ASSIGN_RE = /^\s*(\$?\w+)\s*=\s*([^;]+);\s*(?:\/\/\s*(.*))?\s*$/;
+const ASSIGN_NAME_RE = /^\s*(\$?\w+)\s*=\s*/;
 
-/** 行尾特殊标记（color/font 等，出现在 // 注释末尾，独立于方括号控件）。 */
-const SPECIAL_TAG_RE = /\b(color|font)\b\s*$/i;
+interface AssignLine {
+  name: string;
+  value: string;
+  comment: string;
+}
+
+/** 引号感知地拆出 `name = <value>; // comment` 的三段；本行没有终止分号时返回 null。 */
+function parseAssignLine(line: string): AssignLine | null {
+  const head = ASSIGN_NAME_RE.exec(line);
+  if (!head) return null;
+  let i = head[0].length;
+  let quote = '';
+  while (i < line.length) {
+    const ch = line[i]!;
+    if (quote) {
+      if (ch === '\\') {
+        i += 1;
+      } else if (ch === quote) {
+        quote = '';
+      }
+    } else if (ch === '"' || ch === "'") {
+      quote = ch;
+    } else if (ch === ';') {
+      break;
+    }
+    i += 1;
+  }
+  if (i >= line.length) return null; // 本行没有终止分号（跨行赋值不按参数处理）
+  const value = line.slice(head[0].length, i).trim();
+  if (!value) return null;
+  const rest = line.slice(i + 1);
+  const commentMatch = /^\s*\/\/\s?(.*)$/.exec(rest);
+  return { name: head[1]!, value, comment: commentMatch ? commentMatch[1]!.trim() : '' };
+}
+
+/**
+ * 行尾特殊标记（color/font）。
+ * 只有整条注释恰好是该词时才生效：`// base color` 这类以 color 结尾的普通描述
+ * 不能被误判成取色器（否则数值参数渲染成颜色控件）。
+ */
+const SPECIAL_TAG_RE = /^(color|font)\s*$/i;
+
+/** 从行尾注释里分离出控件定义 `[...]`、特殊标记（color/font）与描述文案。 */
+function splitComment(comment: string): { bracket: string | null; description: string; special?: 'color' | 'font' } {
+  const trimmed = comment.trim();
+  // color/font 特殊标记：注释整体就是该词
+  const tagMatch = SPECIAL_TAG_RE.exec(trimmed);
+  if (tagMatch) {
+    return { bracket: null, description: '', special: tagMatch[1]!.toLowerCase() as 'color' | 'font' };
+  }
+  // 方括号控件
+  const match = /^\[([^\]]*)\]\s*(.*)$/.exec(trimmed);
+  if (match) {
+    return { bracket: match[1] ?? null, description: (match[2] ?? '').trim() };
+  }
+  return { bracket: null, description: trimmed };
+}
 
 /** 判断字符是否为大小括号的开/闭，用于跟踪作用域深度。 */
 function braceDepthDelta(ch: string): number {
@@ -88,25 +144,6 @@ function parseValue(raw: string): {
     type: 'string',
     kind: trimmed.startsWith('[') ? 'vector' : 'expression',
   };
-}
-
-/** 从行尾注释里分离出控件定义 `[...]`、特殊标记（color/font）与描述文案。 */
-function splitComment(comment: string): { bracket: string | null; description: string; special?: 'color' | 'font' } {
-  const trimmed = comment.trim();
-  // 检测 color/font 特殊标记
-  const tagMatch = SPECIAL_TAG_RE.exec(trimmed);
-  let special: 'color' | 'font' | undefined;
-  let rest = trimmed;
-  if (tagMatch) {
-    special = tagMatch[1]!.toLowerCase() as 'color' | 'font';
-    rest = trimmed.slice(0, tagMatch.index).trim();
-  }
-  // 方括号控件
-  const match = /^\[([^\]]*)\]\s*(.*)$/.exec(rest);
-  if (match) {
-    return { bracket: match[1] ?? null, description: (match[2] ?? '').trim(), special };
-  }
-  return { bracket: null, description: rest, special };
 }
 
 /** 把方括号内容解析成控件描述。 */
@@ -232,17 +269,16 @@ export function parseCustomizer(source: string): ScadCustomization {
     }
 
     // 只在深度 0（顶层）收集变量
-    const assignMatch = ASSIGN_RE.exec(code);
-    if (assignMatch && depth <= 0) {
-      const [, name = '', valueRaw = '', comment = ''] = assignMatch;
-      const parsed = parseValue(valueRaw);
+    const assign = parseAssignLine(code);
+    if (assign && depth <= 0) {
+      const parsed = parseValue(assign.value);
       if (parsed) {
-        const { bracket, description, special } = splitComment(comment);
+        const { bracket, description, special } = splitComment(assign.comment);
         const control = parseControl(bracket, parsed.type, special);
         // 描述优先级：行尾描述 > 行前注释描述
         const desc = description || pendingDesc || undefined;
         params.push({
-          name,
+          name: assign.name,
           default: parsed.value,
           type: parsed.type,
           valueKind: parsed.kind,
@@ -252,7 +288,7 @@ export function parseCustomizer(source: string): ScadCustomization {
         });
       }
       pendingDesc = null; // 消费掉
-    } else if (assignMatch === null && code.trim() && !code.trim().startsWith('//')) {
+    } else if (assign === null && code.trim() && !code.trim().startsWith('//')) {
       // 非空、非注释、非声明的行 → 清除待挂载描述（如模块定义等）
       pendingDesc = null;
     }

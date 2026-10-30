@@ -6,6 +6,7 @@
  */
 
 import { PROVIDERS, type WebModelConfig } from './providers.js';
+import type { ModelProvider } from '../core/types.js';
 
 const STORAGE_KEY = 'model-lab-web:config';
 
@@ -24,17 +25,30 @@ export function loadConfig(): WebModelConfig | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as WebModelConfig;
-    if (!parsed || typeof parsed !== 'object' || !Object.hasOwn(PROVIDERS, parsed.provider)) {
+    const parsed = JSON.parse(raw) as Partial<WebModelConfig> | null;
+    const provider = parsed?.provider;
+    if (
+      !parsed ||
+      typeof parsed !== 'object' ||
+      typeof provider !== 'string' ||
+      !Object.hasOwn(PROVIDERS, provider)
+    ) {
       return null;
     }
+    // 逐字段类型校验：坏档（手改/旧版本/损坏）不能让后续 .trim() 直接抛 TypeError
+    const str = (value: unknown, fallback: string): string =>
+      typeof value === 'string' ? value : fallback;
+    const effort = parsed.reasoningEffort;
     return {
-      provider: parsed.provider,
-      model: parsed.model ?? '',
-      apiKey: parsed.apiKey ?? '',
-      baseUrl: parsed.baseUrl,
-      proxyUrl: parsed.proxyUrl ?? defaultConfig().proxyUrl,
-      reasoningEffort: parsed.reasoningEffort,
+      provider: provider as ModelProvider,
+      model: str(parsed.model, ''),
+      apiKey: str(parsed.apiKey, ''),
+      baseUrl: typeof parsed.baseUrl === 'string' ? parsed.baseUrl : undefined,
+      proxyUrl: str(parsed.proxyUrl, defaultConfig().proxyUrl ?? ''),
+      reasoningEffort:
+        effort === 'none' || effort === 'low' || effort === 'medium' || effort === 'high'
+          ? effort
+          : undefined,
     };
   } catch {
     return null;

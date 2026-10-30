@@ -99,3 +99,14 @@ describe('buildDefineArgs', () => {
     ]);
   });
 });
+
+describe('serializeDefineValue：单引号（beta.9）', () => {
+  it('单引号字符串剥引号后按双引号输出（OpenSCAD 不支持单引号）', () => {
+    expect(serializeDefineValue("'green'")).toBe('"green"');
+    expect(serializeDefineValue("'it\\'s'")).toBe('"it\'s"');
+  });
+
+  it('已带双引号的原样透传', () => {
+    expect(serializeDefineValue('"green"')).toBe('"green"');
+  });
+});
