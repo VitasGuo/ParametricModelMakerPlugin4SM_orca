@@ -134,6 +134,29 @@ describe('chat 动作分派', () => {
     expect(response.verification?.status).toBe('failed');
     expect(response.rerollContext?.problems.join(' ')).toContain('这是盒子不是碗');
   });
+
+  it('part_spec 先清洗再交给验证器（非法条目被丢弃）', async () => {
+    mocks.callProvider
+      .mockResolvedValueOnce({
+        text: raw({
+          type: 'replaceSource',
+          scad: GOOD_SCAD,
+          design_plan: '立方体',
+          part_spec: [
+            { kind: 'size', expect: [10, 10, 10], tol: 1 },
+            { kind: 'hole', at: [0, 0], diameter: 8 }, // 坐标不合法 → 丢弃
+          ],
+        }),
+      })
+      .mockResolvedValueOnce({ text: '{"verdict":"pass","reason":"形状符合"}' });
+
+    const verify = vi.fn(async () => outcome());
+    const response = await chat(request(), CFG, verify);
+    expect(response.verification?.status).toBe('passed');
+    const specs = verify.mock.calls[0]![2];
+    expect(specs).toHaveLength(1);
+    expect(specs?.[0]?.kind).toBe('size');
+  });
 });
 
 describe('用户附件图片', () => {

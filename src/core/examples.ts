@@ -10,6 +10,7 @@
  */
 
 import { PARTS_CODE } from '../knowledge/parts.js';
+import { GEARS_CODE } from '../knowledge/gears.js';
 
 /** 范例难度层级。 */
 export type ExampleLevel = 'basic' | 'classic' | 'advanced';
@@ -3567,6 +3568,48 @@ union() {
 }
 `,
   },
+  {
+    id: 66,
+    name: '渐开线齿轮对（中心距校准）',
+    category: '机械传动',
+    level: 'advanced',
+    applies: '齿轮传动件、减速演示、机器人关节齿轮、需要真正啮合的两只齿轮',
+    idea: '齿廓用渐开线函数 inv(a)=tan(a)-a 生成：分度圆处半齿角 90/z，往上按 inv 收缩到齿顶；中心距由 gear_center(m,z1,z2)=m×(z1+z2)/2 算出，两只齿轮按这个距离摆放才不会卡',
+    points: [
+      '渐开线角度：t = sqrt((r/rb)^2 - 1)，φ = t×180/PI - atan(t)；OpenSCAD 的 atan 返回度数，t 是弧度，两者不能直接相减',
+      '基圆 rb = r_pitch×cos(20°)，齿顶 ra = m×(z/2+1)，齿根 rf = m×(z/2-1.25)',
+      '半齿角随半径收缩：h(r) = 90/z + inv(r_pitch) - inv(r)；分度圆处正好 90/z，齿顶处变窄',
+      'z 小于 10 会根切，传动件用 12 齿以上；m 取 1.5~3，m 越小齿越细越难打',
+      '中心距 a = m×(z1+z2)/2 是硬约束：两轴按 a 摆放才啮合；本例是拆解图，真正啮合要按 a 摆位',
+      'part_spec 可声明 teeth（分度圆半径 m×z/2）与 center（两轴距离 a），引擎会实测复核',
+    ],
+    code: `${GEARS_CODE}
+
+/* [齿轮对] */
+module_m = 2; // [1:0.1:4]
+teeth_a = 20; // [8:1:40]
+teeth_b = 30; // [8:1:40]
+gear_thickness = 8; // [4:1:16]
+bore_d = 8; // [4:0.5:20]
+
+/* [排布] */
+part_gap = 10; // [4:2:40]
+
+/* [Hidden] */
+$fn = 48;
+
+// 中心距：两齿轮真正啮合时轴心距离 = 这个值
+center_distance = gear_center(module_m, teeth_a, teeth_b);
+tip_a = module_m * teeth_a / 2 + module_m;
+tip_b = module_m * teeth_b / 2 + module_m;
+
+// 拆解图：两只齿轮平放并列（装配时把 B 移到距 A 中心 center_distance 处）
+translate([tip_a, 0, 0])
+  spur_gear(teeth_a, module_m, gear_thickness, bore_d);
+translate([2 * tip_a + part_gap + tip_b, 0, 0])
+  spur_gear(teeth_b, module_m, gear_thickness, bore_d);
+`,
+  },
 ];
 
 /** 全部分类（按首个出现顺序）。 */
@@ -3577,12 +3620,12 @@ export const EXAMPLE_CATEGORIES: string[] = [...new Set(EXAMPLES.map((e) => e.ca
  *
  * 选取标准：模板复用率高、技巧不可替代，且每个大类至少保留 1 个。
  * 其余范例在 prompt 里只保留「名称 + 适用 + 思路」的目录条目——模型知道
- * 这类东西有解、知道思路，但不必把 66 份源码全文塞进上下文。
+ * 这类东西有解、知道思路，但不必把 67 份源码全文塞进上下文。
  * 源码仍然完整地留在 UI 范例库，用户一键即可载入。
  */
 export const PROMPT_FULL_IDS: readonly number[] = [
   1, 2, 3, 3.5, 6, 7, 10, 11, 16, 17, 20, 22, 30,
-  37, 41, 49, 51, 54, 57, 58, 59, 60, 62, 63, 64,
+  37, 41, 49, 51, 54, 57, 58, 59, 60, 62, 63, 64, 66,
 ];
 
 const PROMPT_FULL = new Set(PROMPT_FULL_IDS);

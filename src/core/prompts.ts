@@ -11,6 +11,7 @@ import { parseCustomizer } from './scad-parser.js';
 import { examplesToPromptText } from './examples.js';
 import { rulesToPromptText } from '../knowledge/rules.js';
 import { PARTS_LIBRARY } from '../knowledge/parts.js';
+import { GEARS_LIBRARY } from '../knowledge/gears.js';
 import { WORKFLOW } from '../knowledge/workflow.js';
 import { ENVIRONMENT } from '../knowledge/environment.js';
 
@@ -31,6 +32,13 @@ export const OUTPUT_SCHEMA = `{
     "scad": "<完整 .scad 源码，必须含 /* [Group] */ Customizer 注释>",
     "design_plan": "<必填。三部分：①套用哪个范例；②关键几何量演算（各原语圆心/半径/交点坐标的实际数值）；③预期轮廓的文字描述（如'一侧弧形凹陷的豆形'）>",
     "self_check": { "<规则编号或检查项>": "<结论 + 数值依据>" },  // 必填：结构类 S01~S08 逐条给结论（引擎会复核）；工艺类挑 1~3 条最相关的即可
+    "part_spec": [      // 可选但推荐：3~8 条关键尺寸声明，引擎用射线实测复核，偏差会触发重抽
+      { "kind": "size", "expect": [x, y, z], "tol": 1 },
+      { "kind": "hole", "at": [x, y, z], "axis": "z", "diameter": 8 },
+      { "kind": "pitch", "at": [x, y, z], "radius": 3.66, "pitch": 1.25 },
+      { "kind": "teeth", "at": [x, y, z], "radius": 20, "count": 20 },
+      { "kind": "center", "a": [x1, y1, z], "b": [x2, y2, z], "distance": 25.2 }
+    ],
     // explain 时
     "text": "<给用户看的中文解释>",
     // batchVariants 时
@@ -351,10 +359,11 @@ const DECISION_TREE = `
   → 范例 25 高斯钟形（正态分布/僧帽/裙摆曲面）
   → 范例 26 心形线（爱心/首饰盘）
   → 范例 27 玫瑰线（花瓣/花朵盘）
-  → 范例 28 齿轮（棘轮/传动件）
+  → 范例 28 齿轮（梯形齿近似，只适合装饰/摆件）
   特征：参数方程 r=f(θ) 生成的规则曲线
   识别词：螺旋、斐波那契、黄金、阿基米德、高斯、正态、心形、
           玫瑰线、花瓣、渐开线、齿轮
+  ⚠️ 要"能转起来"的齿轮不要用范例 28，改用范例 66（渐开线齿廓 + 中心距）
   ⚠️ 用户说"好看的数学感曲线"但说不出名字时，按外观选：
     越转越开→23；等距圈→24；钟形曲面→25；爱心里外→26；放射花瓣→27
 
@@ -461,13 +470,15 @@ const DECISION_TREE = `
   识别词：螺栓、螺母、螺纹、拧、紧固、螺丝、M3、M4、M6、M8、M12
   ⚠️ 功能螺纹禁止手画牙型；M6 以下 FDM 很难拧，功能件优先 ≥M8
   ⚠️ 螺母已内置 clearance；装配靠"拧进去"，不是直插
+  ⚠️ 螺纹件的孔径/牙距写进 part_spec（hole + pitch），引擎会实测牙距是否对
 
 【机械传动与机构】（齿轮/行星减速/连杆/棘轮/凸轮）
+  → 范例 66 渐开线齿轮对（spur_gear + 正确中心距）
   → 范例 62 行星齿轮组（齿数约束 + 内齿圈 + 拆解排布）
-  → 紧固件先查标准件模块库（第九章）
+  → 紧固件先查标准件模块库（第九章），齿轮模块查第十章
   识别词：齿轮、行星、减速、传动、连杆、销轴、凸轮、棘轮
-  ⚠️ 齿轮先算硬约束：内齿数 = 太阳齿数 + 2×行星齿数；中心距 = 模数 ×(z1+z2)/2，
-    两个数都在 design_plan 里写出来，齿形用梯形近似即可
+  ⚠️ 齿轮先算硬约束：外啮合中心距 = 模数 ×(z1+z2)/2；行星内齿数 = 太阳齿数 + 2×行星齿数
+    这两个数都写进 design_plan，能算就同时写进 part_spec
   ⚠️ 装配件按"平铺拆解图"输出：每件单独贴床、互不接触，件数和装配顺序写进 design_plan
 
 【工程结构】（桁架桥/框架/塔架/拱/楼梯/脚手架）
@@ -654,6 +665,8 @@ ${RULE_TEXT}
 
 ${PARTS_LIBRARY}
 
+${GEARS_LIBRARY}
+
 【补充执行细则】
 - 能通过调整已有参数实现的，优先用 updateParams。
 - "再大/再厚/再高一点"这类模糊意图，结合当前参数值给出 ±10%~30% 的变化。
@@ -663,6 +676,7 @@ ${PARTS_LIBRARY}
 - 设计意图优先：先把功能与造型做完整，再谈工艺。不要因为"不好打印"删掉用户要的特征。
 - 复杂模型是优势：机构、装配体、多层结构都支持，用 module 拆分，代码写到 600 行以上也没问题。
 - 机械紧固/传动件先查「九、标准件模块库」：螺纹/螺母直接用 std_bolt / std_nut，不要重画牙型。
+- 齿轮用「十、齿轮模块库」的 spur_gear，中心距按 m(z1+z2)/2 算；关键尺寸能算出来就写进 part_spec（3~8 条）。
 - 生成后必须对照「七、常见错误清单」与「八、结构正确性（硬）与工艺参考（软）」自检，确认无误再输出。`;
 }
 

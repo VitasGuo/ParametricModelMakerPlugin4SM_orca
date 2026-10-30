@@ -5,6 +5,8 @@
  * 便于在 Node 环境单测、在 Side Panel / Background / Content Script 三端共享。
  */
 
+import type { PartCheck } from './part-spec.js';
+
 /** Customizer 参数的 UI 控件类型，对应 OpenSCAD 行尾注释语法。 */
 export type ParamControl =
   | { kind: 'slider'; min: number; max: number; step?: number }
@@ -58,7 +60,17 @@ export interface EditorState {
 /** AI 返回的动作意图。AI 根据 userMessage + state 自行决定 type。 */
 export type AiAction =
   | { type: 'updateParams'; values: Record<string, string | number | boolean> }
-  | { type: 'replaceSource'; scad: string; design_plan?: string; self_check?: Record<string, string> }
+  | {
+      type: 'replaceSource';
+      scad: string;
+      design_plan?: string;
+      self_check?: Record<string, string>;
+      /**
+       * 关键尺寸声明（v0.7.0-beta.4）：引擎编译后按射线实测复核，
+       * 偏差超过 tol 会进重抽问题清单。模型输出未校验，使用前须 normalizePartSpecs。
+       */
+      part_spec?: PartCheck[];
+    }
   | { type: 'explain'; text: string }
   | { type: 'batchVariants'; variants: Record<string, string | number | boolean>[] }
   /** 需求模糊时反问用户（v0.4.0）。 */

@@ -9,6 +9,7 @@
 
 import type { AiAction, AiRequest, AiResponse } from '../core/types.js';
 import { buildSystemPrompt, buildUserContext, parseAiOutput } from '../core/prompts.js';
+import { normalizePartSpecs, type PartCheck } from '../core/part-spec.js';
 import { lintScad } from '../core/lint.js';
 import { parseCustomizer } from '../core/scad-parser.js';
 import { mergeParamValues } from '../engine/defines.js';
@@ -18,7 +19,11 @@ import type { VerifyOutcome } from './verify.js';
 
 const SYSTEM_PROMPT = buildSystemPrompt();
 
-export type VerifyFn = (source: string, values: ParamValues) => Promise<VerifyOutcome>;
+export type VerifyFn = (
+  source: string,
+  values: ParamValues,
+  partSpec?: PartCheck[]
+) => Promise<VerifyOutcome>;
 
 export async function chat(request: AiRequest, cfg: WebModelConfig, verify: VerifyFn): Promise<AiResponse> {
   const system = SYSTEM_PROMPT;
@@ -109,10 +114,11 @@ async function generateOnce(
     .map((i) => `[静态检查] ${i.message}`);
 
   const values = mergeParamValues(parseCustomizer(action.scad).params, currentValues);
+  const specs = normalizePartSpecs(action.part_spec);
 
   let outcome: VerifyOutcome;
   try {
-    outcome = await verify(action.scad, values);
+    outcome = await verify(action.scad, values, specs);
   } catch (e) {
     outcome = {
       ok: false,

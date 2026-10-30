@@ -7,6 +7,12 @@
 
 import { compile } from '../engine/compiler.js';
 import type { CompileResult, MeshSummary, ParamValues } from '../engine/types.js';
+import {
+  describeSpecReport,
+  measurePartSpecs,
+  type PartCheck,
+  type SpecReport,
+} from '../core/part-spec.js';
 import { getCjkFont } from '../storage/fonts.js';
 import { renderContactSheet } from '../viewer/headless.js';
 
@@ -23,12 +29,14 @@ export interface VerifyOutcome {
   screenshot: string;
   /** 网格摘要文本，用于重抽上下文。 */
   summaryText: string;
+  /** part_spec 的特征级尺寸核验报告（无声明或未编译成功时不存在）。 */
+  specReport?: SpecReport;
 }
 
 export async function verifyScad(
   source: string,
   values: ParamValues,
-  options: { timeoutMs?: number; screenshot?: boolean } = {}
+  options: { timeoutMs?: number; screenshot?: boolean; partSpec?: PartCheck[] } = {}
 ): Promise<VerifyOutcome> {
   const font = getCjkFont();
   const result = await compile({
@@ -39,10 +47,14 @@ export async function verifyScad(
     fonts: font ? [{ name: font.name, data: font.data }] : undefined,
   });
 
-  return outcomeFromCompile(result, options.screenshot !== false);
+  return outcomeFromCompile(result, options.screenshot !== false, options.partSpec ?? []);
 }
 
-export function outcomeFromCompile(result: CompileResult, withScreenshot: boolean): VerifyOutcome {
+export function outcomeFromCompile(
+  result: CompileResult,
+  withScreenshot: boolean,
+  partSpec: PartCheck[] = []
+): VerifyOutcome {
   const problems: string[] = [];
   const notes: string[] = [];
   const summaryText = result.summary ? formatSummary(result.summary) : '';
@@ -71,6 +83,22 @@ export function outcomeFromCompile(result: CompileResult, withScreenshot: boolea
 
   if (summaryText) notes.push(`[网格] ${summaryText}`);
 
+  // 特征级尺寸核验：AI 声明的 part_spec 对真实网格做射线实测
+  let specReport: SpecReport | undefined;
+  if (result.ok && !result.empty && result.output && partSpec.length > 0) {
+    try {
+      specReport = measurePartSpecs(result.output, partSpec);
+    } catch {
+      specReport = undefined;
+    }
+  }
+  let specText = '';
+  if (specReport) {
+    notes.push(describeSpecReport(specReport));
+    for (const failure of specReport.failures) problems.push(`[尺寸核验] ${failure}`);
+    specText = [describeSpecReport(specReport), ...specReport.failures].join('\n');
+  }
+
   const screenshot =
     withScreenshot && result.ok && result.output ? renderContactSheet(result.output) : '';
 
@@ -81,7 +109,8 @@ export function outcomeFromCompile(result: CompileResult, withScreenshot: boolea
     problems,
     notes,
     screenshot,
-    summaryText,
+    summaryText: specText ? `${summaryText}\n${specText}`.trim() : summaryText,
+    ...(specReport ? { specReport } : {}),
   };
 }
 

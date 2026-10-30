@@ -461,8 +461,8 @@ export class App {
         history,
         rerollContext: reroll,
       };
-      const response = await chat(request, this.config, (candidate, values) =>
-        verifyScad(candidate, values, { screenshot: true })
+      const response = await chat(request, this.config, (candidate, values, specs) =>
+        verifyScad(candidate, values, { screenshot: true, partSpec: specs })
       );
       logger.info(
         'ai',

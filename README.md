@@ -7,9 +7,9 @@
 **仓库 / Repository**: https://github.com/VitasGuo/ParametricModelMakerPlugin4SM_orca<br>
 **开发者 / Developer**: VitasGuo · **许可证 / License**: [GPL-2.0-only](LICENSE)
 
-> **Beta 预览版 / Beta preview — v0.7.0-beta.3**
-> 核心建模链路与 64 个范例已通过真实引擎 + 结构审计回归；插件安装脚本与各家 AI Provider 的兼容性仍在收集反馈，接口和范例可能继续调整。
-> The core modeling pipeline and all 64 examples pass real-engine and mesh-audit regression. The installer and provider compatibility are still collecting feedback; APIs and examples may change.
+> **Beta 预览版 / Beta preview — v0.7.0-beta.4**
+> 核心建模链路与 65 个范例已通过真实引擎 + 结构审计回归；插件安装脚本与各家 AI Provider 的兼容性仍在收集反馈，接口和范例可能继续调整。
+> The core modeling pipeline and all 65 examples pass real-engine and mesh-audit regression. The installer and provider compatibility are still collecting feedback; APIs and examples may change.
 
 ---
 
@@ -35,10 +35,11 @@ Every model is compiled for real by OpenSCAD WASM inside the browser (not by an 
 - **自然语言建模 / Natural-language modeling**：用一句话描述想要的模型，AI 生成或修改 OpenSCAD 源码。<br>Describe the model you want in one sentence; the AI writes or edits the OpenSCAD source.
 - **对话参考图 / Reference images in chat**：输入框可添加最多 3 张参考图（按钮 / 粘贴 / 拖拽），浏览器内压缩后随消息发给视觉模型；纯文本模型会明确提示看不到图片。<br>Attach up to 3 reference images to a chat message (button / paste / drag-and-drop); they are compressed in the browser and sent to vision models, while text-only models get an explicit "cannot see images" note.
 - **标准件模块库 / Standard parts library**：公制螺纹螺栓、螺母、螺钉过孔、垫圈做成经过装配校验的 SCAD 模块，AI 直接调用而不是每次重画牙型；螺栓螺母用布尔交集验证 0.3mm 间隙能拧进去。<br>Metric threaded bolts, nuts, screw clearance holes, and washers ship as assembly-tested SCAD modules; the AI calls them instead of redrawing thread profiles, and a boolean-intersection test proves a 0.3mm-clearance nut can be screwed on.
+- **齿轮与特征级尺寸核验 / Gears & feature-level dimension checks**：渐开线齿轮模块（模数 / 齿数 / 压力角 20°，中心距 = m(z1+z2)/2）；AI 可在输出里声明 `part_spec`（孔径 / 牙距 / 齿数 / 中心距 / 整体尺寸），引擎对真实网格做射线测量，超差就带着实测值打回重抽。<br>An involute gear module (module / tooth count / 20° pressure angle, center distance = m(z1+z2)/2); the AI may declare a `part_spec` (bore, thread pitch, tooth count, center distance, overall size), which the engine verifies by ray-casting the real mesh — deviations are fed back as measured values for a retry.
 - **真实引擎验证 / Real-engine verification**：每次生成都用 OpenSCAD WASM 编译；语法错误、空模型、尺寸异常会被打回重试。<br>Every generation is compiled with OpenSCAD WASM; syntax errors, empty models, and abnormal dimensions are rejected and retried.
 - **参数面板 / Parameter panel**：按 Customizer 注释自动生成滑杆、枚举、开关、颜色控件，参数通过 `-D` 覆盖，不改写源码。<br>Sliders, enums, checkboxes, and color controls are generated from Customizer annotations; parameters are applied via `-D` overrides without rewriting the source.
 - **3D 预览 / 3D preview**：Three.js Z-up 视图，等轴、正、顶、右视角、线框、截图。<br>Three.js Z-up viewer with iso / front / top / right views, wireframe, and screenshots.
-- **范例库 / Example library**：64 个完整可运行范例，覆盖容器、盒体、收纳、装配配合、壁挂磁吸、园艺、数学曲线、建筑、像素图案、机械传动、工程结构、科学造型、艺术与实用工具，支持搜索、分类、复制、一键载入，全部经真实引擎编译与结构审计。系统提示里只注入 25 个模板范例的完整源码，其余 39 个以「名称 + 适用 + 思路」目录条目注入，兼顾覆盖与上下文体积。<br>64 fully working examples covering containers, boxes, storage, joints and fits, wall mounting and magnets, gardening, mathematical curves, architecture, pixel art, mechanisms, engineering structures, scientific forms, art, and practical tools — searchable, categorized, copyable, and loadable in one click; every one is compiled and mesh-audited by the real engine. The system prompt injects full source for 25 template examples and a name + use + idea catalog for the other 39, balancing coverage against context size.
+- **范例库 / Example library**：65 个完整可运行范例，覆盖容器、盒体、收纳、装配配合、壁挂磁吸、园艺、数学曲线、建筑、像素图案、机械传动、工程结构、科学造型、艺术与实用工具，支持搜索、分类、复制、一键载入，全部经真实引擎编译与结构审计。系统提示里只注入 26 个模板范例的完整源码，其余 39 个以「名称 + 适用 + 思路」目录条目注入，兼顾覆盖与上下文体积。<br>65 fully working examples covering containers, boxes, storage, joints and fits, wall mounting and magnets, gardening, mathematical curves, architecture, pixel art, mechanisms, engineering structures, scientific forms, art, and practical tools — searchable, categorized, copyable, and loadable in one click; every one is compiled and mesh-audited by the real engine. The system prompt injects full source for 26 template examples and a name + use + idea catalog for the other 39, balancing coverage against context size.
 - **复杂结构优先 / Complexity first**：提示词把"设计意图 > 功能 > 结构 > 工艺"写成明确优先级，允许机构、装配体、多层结构写到 600~800 行，鼓励用 module 拆分而不是把结构做简单。<br>The prompt states an explicit priority — design intent &gt; function &gt; structure &gt; printability — and allows 600–800 line mechanisms, assemblies, and multi-layer structures, encouraging module decomposition instead of simplifying the design.
 - **图片转像素画 / Image to pixel art**：选一张图，浏览器内降采样成像素网格，自动生成 OpenSCAD 源码（分层浮雕或拼豆空心珠），像素数据编码进字符串常量，不依赖任何外部文件。<br>Pick an image and it is downsampled to a pixel grid in the browser, then turned into OpenSCAD source (layered relief or hollow beads); the pixel data is encoded as a string constant, so no external files are needed.
 - **批量变体 / Batch variants**：一次生成多组参数，并排编译、缩略图预览、单组应用、全部导出 STL。<br>Generate multiple parameter sets at once, compiled side by side with thumbnail previews; apply one set or export all of them as STL.
@@ -162,9 +163,9 @@ npm run orca:proxy
 ```
 ParametricModelMakerPlugin4SM_orca/
 ├── src/
-│   ├── core/                 # types / scad-parser / lint / prompts / examples / logger
+│   ├── core/                 # types / scad-parser / lint / prompts / examples / part-spec（射线尺寸核验）/ logger
 │   ├── tools/                # image-grid.ts：图片 → 像素网格 → SCAD / image → pixel grid → SCAD
-│   ├── knowledge/            # 知识库：environment.ts（运行环境硬限制）+ workflow.ts（工作流程）+ rules.ts（编号硬约束）/ knowledge base: runtime limits, workflow, numbered rules
+│   ├── knowledge/            # 知识库：environment.ts（运行环境硬限制）+ workflow.ts（工作流程）+ rules.ts（编号硬约束）+ parts.ts（标准件模块）+ gears.ts（渐开线齿轮）/ knowledge base: runtime limits, workflow, numbered rules, standard parts, involute gears
 │   ├── engine/
 │   │   ├── openscad.worker.ts  # WASM 编译 Worker（一次性实例）/ WASM compile worker (one-shot instance)
 │   │   ├── compiler.ts         # 主线程编译 API（超时 / 并发）/ main-thread compile API (timeout / concurrency)
