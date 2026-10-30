@@ -1,5 +1,5 @@
 /**
- * 应用主控制器：布局、状态同步、AI 调用、导出与弹窗。
+ * 应用主控制器：布局、状态同步、AI 调用、导出与侧栏。
  */
 
 import '../styles/app.css';
@@ -29,17 +29,17 @@ import { CodeEditor } from '../editor/editor.js';
 import { ChatPanel } from './chat.js';
 import { ParamPanel } from './params.js';
 import { button, el, clear } from './dom.js';
-import { openSettingsModal } from './settings.js';
-import { openExamplesModal } from './examples.js';
-import { openProjectsModal } from './projects.js';
-import { openBatchModal } from './batch.js';
-import { openHistoryModal } from './history.js';
-import { openImageImportModal } from './image-import.js';
-import { openLogsModal } from './logs.js';
-import { openAboutModal } from './about.js';
-import { openPartsModal } from './parts.js';
+import { openSettingsPanel } from './settings.js';
+import { openExamplesPanel } from './examples.js';
+import { openProjectsPanel } from './projects.js';
+import { openBatchPanel } from './batch.js';
+import { openHistoryPanel } from './history.js';
+import { openImageImportPanel } from './image-import.js';
+import { openLogsPanel } from './logs.js';
+import { openAboutPanel } from './about.js';
+import { openPartsPanel } from './parts.js';
 import { splitMeshParts } from '../core/mesh-parts.js';
-import { toast } from './toast.js';
+import { toast, confirmBar } from './toast.js';
 
 export class App {
   private readonly store = new Store();
@@ -109,8 +109,8 @@ export class App {
         { label: '截图', action: () => void this.saveScreenshot() },
       ]),
       buildMenu('帮助', [
-        { label: '运行日志', action: () => openLogsModal() },
-        { label: '关于', action: () => openAboutModal() },
+        { label: '运行日志', action: () => openLogsPanel() },
+        { label: '关于', action: () => openAboutPanel() },
       ]),
     ]);
 
@@ -561,7 +561,7 @@ export class App {
   private openBatchVariants(variants: Array<Record<string, string | number | boolean>>): void {
     if (variants.length === 0) return;
     const state = this.store.state;
-    openBatchModal({
+    openBatchPanel({
       source: state.project.source,
       params: state.params,
       currentValues: state.project.paramValues,
@@ -580,7 +580,7 @@ export class App {
   }
 
   private openSettings(): void {
-    openSettingsModal(
+    openSettingsPanel(
       this.config,
       (cfg) => {
         this.config = cfg;
@@ -594,7 +594,7 @@ export class App {
   }
 
   private openExamples(): void {
-    openExamplesModal((example) => this.loadExample(example));
+    openExamplesPanel((example) => this.loadExample(example));
   }
 
   private loadExample(example: (typeof EXAMPLES)[number]): void {
@@ -612,7 +612,7 @@ export class App {
   }
 
   private openProjects(): void {
-    openProjectsModal(this.store.state.project, (project) => {
+    openProjectsPanel(this.store.state.project, (project) => {
       this.store.loadProject(project);
       this.lastOutput = null;
       this.viewer.clearModel();
@@ -655,7 +655,7 @@ export class App {
   }
 
   private openImageImport(): void {
-    openImageImportModal((scad, note) => {
+    openImageImportPanel((scad, note) => {
       this.store.replaceSource(scad);
       const snapshot = pushHistory({
         source: scad,
@@ -671,7 +671,7 @@ export class App {
   }
 
   private openHistory(): void {
-    openHistoryModal((source, values) => {
+    openHistoryPanel((source, values) => {
       this.store.restoreSnapshot(source, values);
       this.lastOutput = null;
       this.viewer.clearModel();
@@ -679,9 +679,14 @@ export class App {
   }
 
   private newProject(): void {
-    if (this.store.state.project.source.trim() && !window.confirm('新建项目会清空当前编辑内容，继续？')) {
+    if (this.store.state.project.source.trim()) {
+      confirmBar('新建项目会清空当前编辑内容，继续？', () => this.resetProject());
       return;
     }
+    this.resetProject();
+  }
+
+  private resetProject(): void {
     this.store.newProject();
     this.lastOutput = null;
     this.viewer.clearModel();
@@ -714,7 +719,7 @@ export class App {
       return;
     }
     logger.info('export', '分件导出', `${split.parts.length} 件`);
-    openPartsModal({
+    openPartsPanel({
       parts: split.parts,
       stls: split.stls,
       baseName: safeName(this.store.state.project.name),

@@ -1,22 +1,22 @@
-/** 范例库弹窗：搜索、分类过滤、载入/复制。 */
+/** 范例库侧栏：搜索、分类过滤、载入/复制。 */
 
 import { EXAMPLE_CATEGORIES, EXAMPLES, LEVEL_LABELS, type ModelingExample } from '../core/examples.js';
-import { button, clear, el, input, modal } from './dom.js';
+import { button, clear, drawer, el, input } from './dom.js';
 import { toast } from './toast.js';
 
-export function openExamplesModal(onPick: (example: ModelingExample) => void): void {
+export function openExamplesPanel(onPick: (example: ModelingExample) => void): void {
   const search = input('search', '', '搜索名称、用途、思路…');
   const chips = el('div', 'chips');
   const list = el('div', 'example-list');
   let category = '全部';
 
-  const body = el('div', 'modal-body', [
+  const body = el('div', 'drawer-body', [
     el('div', 'example-toolbar', [search]),
     chips,
     list,
   ]);
 
-  const dialog = modal('建模范例库', body, () => {});
+  const dialog = drawer('建模范例库', body, () => {}, { side: 'left', width: 620 });
 
   const categories = ['全部', ...EXAMPLE_CATEGORIES];
   for (const cat of categories) {

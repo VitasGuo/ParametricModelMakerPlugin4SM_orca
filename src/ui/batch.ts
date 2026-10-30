@@ -8,7 +8,7 @@ import type { ParamValue, ParamValues } from '../engine/types.js';
 import { renderContactSheet } from '../viewer/headless.js';
 import { getCjkFont } from '../storage/fonts.js';
 import { safeName, downloadBlob } from '../storage/projects.js';
-import { button, el, modal } from './dom.js';
+import { button, drawer, el } from './dom.js';
 import { toast } from './toast.js';
 
 export interface BatchItem {
@@ -18,7 +18,7 @@ export interface BatchItem {
   screenshot?: string;
 }
 
-export function openBatchModal(options: {
+export function openBatchPanel(options: {
   source: string;
   params: ScadParam[];
   currentValues: ParamValues;
@@ -31,11 +31,11 @@ export function openBatchModal(options: {
   }));
 
   const grid = el('div', 'batch-grid');
-  const body = el('div', 'modal-body', [
+  const body = el('div', 'drawer-body', [
     el('div', 'settings-note full', ['正在用真实引擎并行编译各组变体…']),
     grid,
   ]);
-  const dialog = modal(`批量变体（${items.length} 组）`, body, () => {});
+  const dialog = drawer(`批量变体（${items.length} 组）`, body, () => {}, { side: 'right', width: 780 });
 
   const cards = items.map((item) => {
     const img = el('img', '');
@@ -59,7 +59,7 @@ export function openBatchModal(options: {
     return { item, img, status };
   });
 
-  const footer = el('div', 'modal-actions', [
+  const footer = el('div', 'drawer-actions', [
     button('导出全部 STL', 'btn btn-accent', () => void exportAll(items)),
   ]);
   body.appendChild(footer);

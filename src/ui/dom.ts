@@ -64,16 +64,36 @@ export function field(label: string, control: HTMLElement, hint?: string): HTMLE
   ]);
 }
 
-export function modal(title: string, body: HTMLElement, onClose: () => void): { root: HTMLElement; close: () => void } {
-  const overlay = el('div', 'modal-overlay');
-  const card = el('div', 'modal-card', [
-    el('div', 'modal-head', [
+export interface DrawerOptions {
+  /** 从哪一侧滑入：浏览类（范例/历史/项目）用 left，工具类用 right。 */
+  side?: 'left' | 'right';
+  /** 面板宽度（px），默认 460；窄屏自动收敛到 94vw。 */
+  width?: number;
+}
+
+/**
+ * 侧边抽屉：贴边滑入的全高面板，替代居中浮窗。
+ * 点击面板外或按 Esc 关闭；body 自行使用 `drawer-body` 类负责滚动。
+ */
+export function drawer(
+  title: string,
+  body: HTMLElement,
+  onClose: () => void,
+  options: DrawerOptions = {}
+): { root: HTMLElement; close: () => void } {
+  const side = options.side ?? 'right';
+  const overlay = el('div', `drawer-overlay ${side}`);
+  const sheet = el('div', `drawer ${side}`, [
+    el('div', 'drawer-head', [
       el('h2', '', [title]),
       button('关闭', 'btn btn-ghost', () => close()),
     ]),
     body,
   ]);
-  overlay.appendChild(card);
+  sheet.setAttribute('role', 'dialog');
+  sheet.setAttribute('aria-label', title);
+  if (options.width) sheet.style.width = `min(${options.width}px, 94vw)`;
+  overlay.appendChild(sheet);
 
   function close(): void {
     overlay.remove();

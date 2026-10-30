@@ -53,6 +53,8 @@ const en: Record<string, string> = {
   代码: 'Code',
   关闭: 'Close',
   取消: 'Cancel',
+  确认: 'Confirm',
+  '清空全部历史版本？此操作不可撤销。': 'Clear all history? This cannot be undone.',
   重新编译: 'Recompile',
   线框: 'Wireframe',
   截图: 'Screenshot',

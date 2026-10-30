@@ -1,15 +1,15 @@
-/** 关于弹窗：版本、作者、许可证与仓库地址。 */
+/** 关于侧栏：版本、作者、许可证与仓库地址。 */
 
 import { APP_AUTHOR, APP_VERSION, REPO_URL } from '../version.js';
-import { el, modal } from './dom.js';
+import { drawer, el } from './dom.js';
 
-export function openAboutModal(): void {
+export function openAboutPanel(): void {
   const repo = el('a', 'about-link', [REPO_URL]);
   repo.href = REPO_URL;
   repo.target = '_blank';
   repo.rel = 'noreferrer noopener';
 
-  const body = el('div', 'modal-body about-body', [
+  const body = el('div', 'drawer-body about-body', [
     el('div', 'about-head', [
       el('img', 'about-icon', []),
       el('div', '', [
@@ -35,5 +35,5 @@ export function openAboutModal(): void {
   const icon = body.querySelector<HTMLImageElement>('.about-icon');
   if (icon) icon.src = './icon.svg';
 
-  modal('关于', body, () => {});
+  drawer('关于', body, () => {}, { side: 'right', width: 380 });
 }

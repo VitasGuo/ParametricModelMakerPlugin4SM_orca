@@ -1,13 +1,13 @@
-/** 模型设置弹窗。 */
+/** 模型设置侧栏。 */
 
 import type { ModelProvider } from '../core/types.js';
 import { defaultConfig } from '../ai/config.js';
 import { PROVIDERS, type WebModelConfig } from '../ai/providers.js';
 import { clearCjkFont, getCjkFont, saveCjkFont } from '../storage/fonts.js';
-import { button, el, field, input, modal, select } from './dom.js';
+import { button, drawer, el, field, input, select } from './dom.js';
 import { toast } from './toast.js';
 
-export function openSettingsModal(
+export function openSettingsPanel(
   current: WebModelConfig | null,
   onSave: (cfg: WebModelConfig) => void,
   onFontChanged?: () => void
@@ -112,7 +112,7 @@ export function openSettingsModal(
   });
   modelInput.addEventListener('input', refreshVisionHint);
 
-  const body = el('div', 'modal-body', [
+  const body = el('div', 'drawer-body', [
     el('div', 'settings-grid', [
       field('Provider', providerSelect),
       field('模型', modelInput),
@@ -136,13 +136,13 @@ export function openSettingsModal(
   ]);
 
   body.appendChild(
-    el('div', 'modal-actions', [
+    el('div', 'drawer-actions', [
       button('取消', 'btn btn-ghost', () => close()),
       button('保存设置', 'btn btn-accent', () => save()),
     ])
   );
 
-  const dialog = modal('模型设置', body, () => {});
+  const dialog = drawer('模型设置', body, () => {}, { side: 'right', width: 460 });
   const close = dialog.close;
   refreshProviderHints();
 

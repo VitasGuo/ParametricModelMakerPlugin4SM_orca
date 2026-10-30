@@ -1,12 +1,12 @@
 /**
- * 「从图片生成像素画」弹窗。
+ * 「从图片生成像素画」侧栏。
  *
  * 引擎读不到外部文件，所以图片在浏览器里降采样成像素网格，再编码成 SCAD 里
  * 的一个字符串常量（范例 60 的结构）。这里只负责选图、调格数/色阶、预览与生成。
  */
 
 import { countParts, gridFromImage, gridToScad, type PixelGrid } from '../tools/image-grid.js';
-import { button, el, field, input, modal, select } from './dom.js';
+import { button, drawer, el, field, input, select } from './dom.js';
 import { toast } from './toast.js';
 
 const STYLE_OPTIONS = [
@@ -14,7 +14,7 @@ const STYLE_OPTIONS = [
   { value: '1', label: '拼豆空心珠' },
 ];
 
-export function openImageImportModal(onGenerate: (scad: string, note: string) => void): void {
+export function openImageImportPanel(onGenerate: (scad: string, note: string) => void): void {
   let grid: PixelGrid | null = null;
   let fileName = '';
 
@@ -68,7 +68,7 @@ export function openImageImportModal(onGenerate: (scad: string, note: string) =>
   });
   generateBtn.disabled = true;
 
-  const body = el('div', 'modal-body', [
+  const body = el('div', 'drawer-body', [
     el('div', 'field-hint', [
       '图片会在浏览器里降采样成网格，再生成 OpenSCAD 源码。深色部分变成实体，浅色留白；线稿、剪影、logo 效果最好。',
     ]),
@@ -84,14 +84,14 @@ export function openImageImportModal(onGenerate: (scad: string, note: string) =>
     field('格子尺寸（mm）', cellInput, '拼豆建议 5~6mm，浮雕 4~8mm'),
     field('反相', invertBox, '勾选后浅色变成实体（适合深底浅线的图）'),
     info,
-    el('div', 'modal-actions', [
+    el('div', 'drawer-actions', [
       el('span', 'spacer'),
       button('取消', 'btn btn-ghost', () => dialog.close()),
       generateBtn,
     ]),
   ]);
 
-  const dialog = modal('从图片生成像素画', body, () => {});
+  const dialog = drawer('从图片生成像素画', body, () => {}, { side: 'right', width: 440 });
 
   pickInput.addEventListener('change', () => {
     const file = pickInput.files?.[0];

@@ -1,4 +1,4 @@
-/** 历史版本弹窗：自动命名快照的载入、导出与删除。 */
+/** 历史版本侧栏：自动命名快照的载入、导出与删除。 */
 
 import type { ParamValues } from '../engine/types.js';
 import {
@@ -9,8 +9,8 @@ import {
   type HistoryEntry,
 } from '../storage/history.js';
 import { downloadBlob, safeName } from '../storage/projects.js';
-import { button, clear, el, modal } from './dom.js';
-import { toast } from './toast.js';
+import { button, clear, drawer, el } from './dom.js';
+import { toast, confirmBar } from './toast.js';
 
 const ACTION_LABELS: Record<HistoryAction, string> = {
   ai: 'AI 生成',
@@ -20,22 +20,23 @@ const ACTION_LABELS: Record<HistoryAction, string> = {
   image: '图片导入',
 };
 
-export function openHistoryModal(onRestore: (source: string, values: ParamValues) => void): void {
+export function openHistoryPanel(onRestore: (source: string, values: ParamValues) => void): void {
   const list = el('div', 'history-list');
-  const body = el('div', 'modal-body history-body', [list]);
+  const body = el('div', 'drawer-body history-body', [list]);
   body.appendChild(
-    el('div', 'modal-actions', [
+    el('div', 'drawer-actions', [
       button('清空历史', 'btn btn-ghost', () => {
-        if (!window.confirm('清空全部历史版本？此操作不可撤销。')) return;
-        clearHistory();
-        render();
-        toast('历史版本已清空');
+        confirmBar('清空全部历史版本？此操作不可撤销。', () => {
+          clearHistory();
+          render();
+          toast('历史版本已清空');
+        });
       }),
       button('关闭', 'btn btn-accent', () => dialog.close()),
     ])
   );
 
-  const dialog = modal('历史版本', body, () => {});
+  const dialog = drawer('历史版本', body, () => {}, { side: 'left', width: 440 });
   render();
 
   function render(): void {

@@ -1,8 +1,8 @@
-/** 运行日志弹窗：按级别过滤、复制、导出、清空。 */
+/** 运行日志侧栏：按级别过滤、复制、导出、清空。 */
 
 import { clearLogs, formatLogs, subscribeLogs, type LogEntry, type LogLevel } from '../core/logger.js';
 import { downloadBlob } from '../storage/projects.js';
-import { button, clear, el, modal } from './dom.js';
+import { button, clear, drawer, el } from './dom.js';
 import { toast } from './toast.js';
 
 const FILTERS: Array<{ value: LogLevel | 'all'; label: string }> = [
@@ -12,14 +12,14 @@ const FILTERS: Array<{ value: LogLevel | 'all'; label: string }> = [
   { value: 'error', label: '错误' },
 ];
 
-export function openLogsModal(): void {
+export function openLogsPanel(): void {
   let filter: LogLevel | 'all' = 'all';
   let latest: readonly LogEntry[] = [];
 
   const chips = el('div', 'chips');
   const list = el('div', 'log-list');
 
-  const body = el('div', 'modal-body log-body', [chips, list]);
+  const body = el('div', 'drawer-body log-body', [chips, list]);
 
   for (const item of FILTERS) {
     const chip = button(item.label, item.value === 'all' ? 'chip active' : 'chip', () => {
@@ -32,7 +32,7 @@ export function openLogsModal(): void {
     chips.appendChild(chip);
   }
 
-  const footer = el('div', 'modal-actions', [
+  const footer = el('div', 'drawer-actions', [
     button('复制', 'btn btn-ghost', () => {
       void navigator.clipboard
         .writeText(formatLogs())
@@ -51,7 +51,7 @@ export function openLogsModal(): void {
   ]);
   body.appendChild(footer);
 
-  const dialog = modal('运行日志', body, () => unsubscribe());
+  const dialog = drawer('运行日志', body, () => unsubscribe(), { side: 'right', width: 600 });
   const unsubscribe = subscribeLogs((logs) => {
     latest = logs;
     render();

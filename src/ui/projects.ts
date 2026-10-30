@@ -1,4 +1,4 @@
-/** 项目列表 / 导入导出弹窗。 */
+/** 项目列表 / 导入导出侧栏。 */
 
 import type { ProjectState } from '../state/store.js';
 import {
@@ -8,10 +8,10 @@ import {
   readProjectFile,
   saveProject,
 } from '../storage/projects.js';
-import { button, clear, el, modal } from './dom.js';
-import { toast } from './toast.js';
+import { button, clear, drawer, el } from './dom.js';
+import { toast, confirmBar } from './toast.js';
 
-export function openProjectsModal(
+export function openProjectsPanel(
   current: ProjectState,
   onLoad: (project: ProjectState) => void
 ): void {
@@ -21,7 +21,7 @@ export function openProjectsModal(
   fileInput.accept = '.json,.modellab.json,application/json';
   fileInput.style.display = 'none';
 
-  const body = el('div', 'modal-body', [
+  const body = el('div', 'drawer-body', [
     el('div', 'example-toolbar', [
       button('保存当前项目', 'btn btn-accent', () => {
         saveProject(current);
@@ -35,7 +35,7 @@ export function openProjectsModal(
     fileInput,
   ]);
 
-  const dialog = modal('项目', body, () => {});
+  const dialog = drawer('项目', body, () => {}, { side: 'left', width: 460 });
 
   fileInput.addEventListener('change', async () => {
     const file = fileInput.files?.[0];
@@ -72,9 +72,10 @@ export function openProjectsModal(
           onLoad(project);
         }),
         button('删除', 'btn btn-sm btn-ghost', () => {
-          if (!window.confirm(`删除项目「${project.name}」？`)) return;
-          deleteProject(project.id);
-          render();
+          confirmBar(`删除项目「${project.name}」？`, () => {
+            deleteProject(project.id);
+            render();
+          });
         }),
       ]);
       list.appendChild(row);

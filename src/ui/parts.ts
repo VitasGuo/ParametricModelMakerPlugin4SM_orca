@@ -1,5 +1,5 @@
 /**
- * 分件导出弹窗（装配体）。
+ * 分件导出侧栏（装配体）。
  *
  * 装配体在源码里是"多件并列"，导出前需要按连通实体拆开分别切片。
  * 这里只做展示与下载；拆分算法见 src/core/mesh-parts.ts。
@@ -7,10 +7,10 @@
 
 import type { MeshPart } from '../core/mesh-parts.js';
 import { downloadArrayBuffer } from '../storage/projects.js';
-import { button, el, modal } from './dom.js';
+import { button, drawer, el } from './dom.js';
 import { toast } from './toast.js';
 
-export interface PartsModalOptions {
+export interface PartsPanelOptions {
   parts: MeshPart[];
   /** 与 parts 下标对齐的分件 STL。 */
   stls: ArrayBuffer[];
@@ -18,10 +18,10 @@ export interface PartsModalOptions {
   baseName: string;
 }
 
-export function openPartsModal(options: PartsModalOptions): void {
+export function openPartsPanel(options: PartsPanelOptions): void {
   const { parts, stls, baseName } = options;
-  const body = el('div', 'modal-body');
-  const dialog = modal('分件导出', body, () => undefined);
+  const body = el('div', 'drawer-body');
+  const dialog = drawer('分件导出', body, () => undefined, { side: 'right', width: 460 });
 
   body.appendChild(
     el('div', 'parts-note', [
@@ -45,7 +45,7 @@ export function openPartsModal(options: PartsModalOptions): void {
   });
   body.appendChild(list);
 
-  const actions = el('div', 'modal-actions', [
+  const actions = el('div', 'drawer-actions', [
     parts.length > 1 ? button('全部导出', 'btn btn-accent', () => downloadAll()) : null,
     button('关闭', 'btn btn-ghost', () => dialog.close()),
   ]);

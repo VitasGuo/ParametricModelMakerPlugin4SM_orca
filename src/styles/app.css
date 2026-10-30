@@ -933,36 +933,72 @@ button {
   background: var(--border);
 }
 
-/* ---------------- modal ---------------- */
+/* ---------------- drawer（贴边侧栏，替代居中浮窗） ---------------- */
 
-.modal-overlay {
+.drawer-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(3, 7, 12, 0.72);
-  backdrop-filter: blur(6px);
-  display: grid;
-  place-items: center;
+  display: flex;
+  background: transparent;
   z-index: 100;
-  padding: 20px;
 }
 
-.modal-card {
-  width: min(760px, 94vw);
-  max-height: min(760px, 88vh);
+.drawer-overlay.left {
+  justify-content: flex-start;
+}
+
+.drawer-overlay.right {
+  justify-content: flex-end;
+}
+
+.drawer {
   display: flex;
   flex-direction: column;
+  width: min(460px, 94vw);
+  height: 100%;
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 14px;
-  box-shadow: var(--shadow);
   overflow: hidden;
 }
 
-.modal-card.wide {
-  width: min(980px, 94vw);
+.drawer.left {
+  border-left: none;
 }
 
-.modal-head {
+.drawer.right {
+  border-right: none;
+}
+
+/* 从哪一侧滑入就从哪一侧投影 */
+.drawer.left {
+  box-shadow: 24px 0 60px rgba(0, 0, 0, 0.35);
+  animation: drawer-in-left 0.22s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.drawer.right {
+  box-shadow: -24px 0 60px rgba(0, 0, 0, 0.35);
+  animation: drawer-in-right 0.22s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+@keyframes drawer-in-left {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes drawer-in-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.drawer-head {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -970,16 +1006,17 @@ button {
   border-bottom: 1px solid var(--border-soft);
 }
 
-.modal-head h2 {
+.drawer-head h2 {
   margin: 0;
   font-size: 15px;
   flex: 1;
 }
 
-.modal-body {
+.drawer-body {
+  flex: 1;
+  min-height: 0;
   padding: 16px;
   overflow-y: auto;
-  min-height: 0;
 }
 
 /* ---------------- examples ---------------- */
@@ -1125,7 +1162,7 @@ button {
   color: #ffd28a;
 }
 
-.modal-actions {
+.drawer-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
@@ -1228,6 +1265,44 @@ button {
 .toast.err {
   border-color: rgba(248, 81, 73, 0.45);
   color: #ffb4ae;
+}
+
+/* 底部确认条：替代 window.confirm，不遮挡主界面 */
+.confirm-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 60px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 92vw;
+  padding: 8px 10px 8px 14px;
+  background: var(--panel-3);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  z-index: 210;
+  animation: confirm-in 0.16s ease;
+}
+
+.confirm-text {
+  font-size: 12px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@keyframes confirm-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
 }
 
 /* ---------------- responsive ---------------- */
@@ -1476,7 +1551,7 @@ button {
   font-variant-numeric: tabular-nums;
 }
 
-/* 图片导入弹窗 */
+/* 图片导入面板 */
 .pixel-row {
   display: flex;
   align-items: center;
@@ -1755,9 +1830,9 @@ html[data-theme="light"] .menu button { color: var(--text); }
 html[data-theme="light"] .menu button:hover { background: var(--panel-3); }
 html[data-theme="light"] .menu .menu-hint { color: var(--muted-2); }
 
-html[data-theme="light"] .modal-card { background: #fff; border-color: var(--border); }
-html[data-theme="light"] .modal-head { border-color: var(--border-soft); }
-html[data-theme="light"] .modal-head h2 { color: var(--text); }
+html[data-theme="light"] .drawer { background: #fff; border-color: var(--border); }
+html[data-theme="light"] .drawer-head { border-color: var(--border-soft); }
+html[data-theme="light"] .drawer-head h2 { color: var(--text); }
 
 html[data-theme="light"] .example-card,
 html[data-theme="light"] .project-row,
@@ -1794,6 +1869,7 @@ html[data-theme="light"] .toast {
   box-shadow: var(--shadow);
 }
 html[data-theme="light"] .toast.err { color: #cb2634; border-color: #fbcdc9; }
+html[data-theme="light"] .confirm-bar { background: #fff; border-color: var(--border); }
 html[data-theme="light"] .param-empty,
 html[data-theme="light"] .verify.skipped { color: var(--muted); }
 html[data-theme="light"] .verify.passed { color: #00875a; background: #e8f8f2; }
