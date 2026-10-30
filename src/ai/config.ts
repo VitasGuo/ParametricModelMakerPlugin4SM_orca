@@ -25,7 +25,7 @@ export function loadConfig(): WebModelConfig | null {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as WebModelConfig;
-    if (!parsed || typeof parsed !== 'object' || !(parsed.provider in PROVIDERS)) {
+    if (!parsed || typeof parsed !== 'object' || !Object.hasOwn(PROVIDERS, parsed.provider)) {
       return null;
     }
     return {

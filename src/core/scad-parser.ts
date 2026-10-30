@@ -173,35 +173,37 @@ export function parseCustomizer(source: string): ScadCustomization {
 
   for (let li = 0; li < lines.length; li++) {
     const line = lines[li]!;
+    let code = line;
 
     // 块注释跨行处理
     if (inBlockComment) {
-      const close = line.indexOf('*/');
+      const close = code.indexOf('*/');
       if (close === -1) continue;
       inBlockComment = false;
       // 闭后的剩余部分继续处理
-      const after = line.slice(close + 2);
+      const after = code.slice(close + 2);
       if (after.trim()) {
         // 简化：闭后同行有内容时，按新行处理（递归一次即可）
-        lines[li] = after;
+        code = after;
       } else {
         continue;
       }
     }
 
-    // 分组注释（单行内的 /* [Name] */）
-    const groupMatch = GROUP_RE.exec(line);
+    // 分组注释（单行内的 /* [Name] */）；同一行后面如果还有变量声明，继续解析
+    const groupMatch = GROUP_RE.exec(code);
     if (groupMatch) {
       currentGroup = groupMatch[1]!.trim();
       if (currentGroup.toLowerCase() === 'hidden') {
         hiddenGroups.push('Hidden');
       }
       pendingDesc = null; // 分组注释清除待挂载描述
-      continue;
+      code = code.replace(GROUP_RE, '');
+      if (!code.trim()) continue;
     }
 
     // 跟踪块注释开启（/* ... */ 跨行）
-    const codeForDepth = stripLineComment(line);
+    const codeForDepth = stripLineComment(code);
     // 检测块注释开启
     const blockOpen = codeForDepth.indexOf('/*');
     if (blockOpen !== -1 && codeForDepth.indexOf('*/', blockOpen) === -1) {
@@ -220,7 +222,7 @@ export function parseCustomizer(source: string): ScadCustomization {
     }
 
     // 行前注释：纯注释行（// 开头，去掉空格），记录为 pendingDesc
-    const commentOnly = /^\s*\/\/\s*(.*)$/.exec(line);
+    const commentOnly = /^\s*\/\/\s*(.*)$/.exec(code);
     if (commentOnly && depth <= 0) {
       const desc = commentOnly[1]!.trim();
       if (desc) {
@@ -230,7 +232,7 @@ export function parseCustomizer(source: string): ScadCustomization {
     }
 
     // 只在深度 0（顶层）收集变量
-    const assignMatch = ASSIGN_RE.exec(line);
+    const assignMatch = ASSIGN_RE.exec(code);
     if (assignMatch && depth <= 0) {
       const [, name = '', valueRaw = '', comment = ''] = assignMatch;
       const parsed = parseValue(valueRaw);
@@ -250,7 +252,7 @@ export function parseCustomizer(source: string): ScadCustomization {
         });
       }
       pendingDesc = null; // 消费掉
-    } else if (assignMatch === null && line.trim() && !line.trim().startsWith('//')) {
+    } else if (assignMatch === null && code.trim() && !code.trim().startsWith('//')) {
       // 非空、非注释、非声明的行 → 清除待挂载描述（如模块定义等）
       pendingDesc = null;
     }
@@ -261,11 +263,57 @@ export function parseCustomizer(source: string): ScadCustomization {
   return { params, hiddenGroups: dedupe(hiddenGroups) };
 }
 
-/** 去除行内 `//` 注释（不处理块注释）。 */
+/** 去除行内 `//` 注释（识别字符串，避免把 "http://…" 当成注释）。 */
 function stripLineComment(line: string): string {
-  // 简单处理：不处理字符串内的 //（OpenSCAD 字符串里 // 少见）
-  const idx = line.indexOf('//');
-  return idx === -1 ? line : line.slice(0, idx);
+  let quote = '';
+  for (let i = 0; i < line.length - 1; i++) {
+    const ch = line[i]!;
+    if (quote) {
+      if (ch === '\\') i++;
+      else if (ch === quote) quote = '';
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      quote = ch;
+      continue;
+    }
+    if (ch === '/' && line[i + 1] === '/') return line.slice(0, i);
+  }
+  return line;
+}
+
+/**
+ * 去掉注释与字符串内容（保留换行，便于按行定位）。
+ * lint 用它做关键词检查，避免注释里的 `$fn =` / `while(` 误报。
+ */
+export function stripCommentsAndStrings(source: string): string {
+  let out = '';
+  let quote = '';
+  let inBlock = false;
+  for (let i = 0; i < source.length; i++) {
+    const ch = source[i]!;
+    const next = source[i + 1];
+    if (inBlock) {
+      if (ch === '*' && next === '/') { inBlock = false; i++; out += '  '; }
+      else out += ch === '\n' ? '\n' : ' ';
+      continue;
+    }
+    if (quote) {
+      if (ch === '\\') { out += ' '; if (next !== '\n') { out += ' '; i++; } continue; }
+      if (ch === quote) { quote = ''; out += ' '; continue; }
+      out += ch === '\n' ? '\n' : ' ';
+      continue;
+    }
+    if (ch === '"' || ch === "'") { quote = ch; out += ' '; continue; }
+    if (ch === '/' && next === '*') { inBlock = true; i++; out += '  '; continue; }
+    if (ch === '/' && next === '/') {
+      while (i < source.length && source[i] !== '\n') { out += ' '; i++; }
+      if (i < source.length) out += '\n';
+      continue;
+    }
+    out += ch;
+  }
+  return out;
 }
 
 function dedupe(arr: string[]): string[] {

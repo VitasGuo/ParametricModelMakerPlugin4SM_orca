@@ -304,11 +304,17 @@ async function postJson<T>(
         response = await fetch(targetUrl, { method: 'POST', headers, body: requestBody });
       }
     } catch (e) {
-      throw new ProviderError(
-        `无法连接 ${targetUrl}。可能是网络问题、CORS 限制或代理未配置。`,
-        undefined,
-        e instanceof Error ? e.message : String(e)
-      );
+      const detail = e instanceof Error ? e.message : String(e);
+      // 网络抖动/CORS 预检失败也按指数退避重试，最后一次才报错
+      if (attempt === MAX_ATTEMPTS) {
+        throw new ProviderError(
+          `无法连接 ${targetUrl}。可能是网络问题、CORS 限制或代理未配置。`,
+          undefined,
+          detail
+        );
+      }
+      await delay(retryDelayMs(null, attempt));
+      continue;
     }
 
     const text = await response.text();

@@ -242,7 +242,12 @@ export class Store {
     const parsed = parseCustomizer(project.source);
     this.state = {
       ...this.state,
-      project: { ...project, updatedAt: Date.now() },
+      project: {
+        ...project,
+        // 源码可能被外部改过：旧参数值要按当前参数表重新对齐，缺的补默认
+        paramValues: mergeParamValues(parsed.params, project.paramValues),
+        updatedAt: Date.now(),
+      },
       params: parsed.params,
       hiddenGroups: parsed.hiddenGroups,
       compile: null,

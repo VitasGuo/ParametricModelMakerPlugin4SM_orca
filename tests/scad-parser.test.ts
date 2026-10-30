@@ -133,6 +133,18 @@ b = 2;
     expect(r.params.find((p) => p.name === 'a')?.group).toBe('A');
     expect(r.params.find((p) => p.name === 'b')?.group).toBe('B');
   });
+
+  it('分组注释与变量写在同一行时也收集变量', () => {
+    const r = parseCustomizer('/* [Box] */ size = 30; // [10:50]\n/* [Hidden] */ $fn = 32;\ncube(size);');
+    expect(r.params.map((p) => p.name)).toEqual(['size', '$fn']);
+    expect(r.params[0]!.group).toBe('Box');
+    expect(r.hiddenGroups).toContain('Hidden');
+  });
+
+  it('字符串里的 // 不被当作行注释', () => {
+    const r = parseCustomizer('/* [Link] */\nurl = "http://example.com/a"; // 网址\ncube(10);');
+    expect(r.params.find((p) => p.name === 'url')?.default).toBe('http://example.com/a');
+  });
 });
 
 describe('injectParams / formatValue', () => {

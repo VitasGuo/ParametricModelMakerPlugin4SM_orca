@@ -63,6 +63,16 @@ describe('lintScad 语法与可打印性', () => {
     const issues = lintScad('x = 10;\nx = 20;\ncube(x);');
     expect(issues.some((i) => i.level === 'warn' && i.message.includes('赋值了 2 次'))).toBe(true);
   });
+
+  it('注释里的 $fn / while 不误报', () => {
+    const issues = lintScad('/* [Hidden] */\n$fn = 64;\n// $fn = 32;\n// 用 while (true) 是不行的，这里只是注释\n/* while (x) { } */\ncube(10);');
+    expect(issues.filter((i) => i.level === 'error')).toHaveLength(0);
+  });
+
+  it('字符串里的 while / $fn 不误报', () => {
+    const issues = lintScad('/* [Hidden] */\n$fn = 64;\nlabel = "while (true) and $fn = 8";\ncube(10);');
+    expect(issues.filter((i) => i.level === 'error')).toHaveLength(0);
+  });
 });
 
 describe('lintScad 干净代码', () => {

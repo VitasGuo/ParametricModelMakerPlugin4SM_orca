@@ -7,7 +7,7 @@
  * 独立网页和插件共用。
  */
 
-import { parseCustomizer } from './scad-parser.js';
+import { parseCustomizer, stripCommentsAndStrings } from './scad-parser.js';
 
 export interface LintIssue {
   level: 'error' | 'warn';
@@ -37,8 +37,11 @@ export function lintScad(source: string): LintIssue[] {
     }
   }
 
+  // 关键词检查只看代码：注释/字符串里的 $fn、while 不算
+  const codeOnly = stripCommentsAndStrings(source);
+
   // 2. $fn 必须在 [Hidden] 组（否则参数索引错位，traps.md #8）
-  if (/\$fn\s*=/.test(source)) {
+  if (/\$fn\s*=/.test(codeOnly)) {
     const fnHidden = params.some((p) => p.name === '$fn' && hiddenGroups.some((hg) => p.group.toLowerCase() === hg.toLowerCase()));
     if (!fnHidden) {
       issues.push({ level: 'error', message: '$fn 未放入 /* [Hidden] */ 组：会渲染成多余控件，参数面板会显示技术参数' });
@@ -46,7 +49,7 @@ export function lintScad(source: string): LintIssue[] {
   }
 
   // 3. while 循环（OpenSCAD 不支持）
-  if (/while\s*\(/.test(source)) {
+  if (/while\s*\(/.test(codeOnly)) {
     issues.push({ level: 'error', message: '检测到 while 循环：OpenSCAD 不支持 while，必须用 for 或递归函数重写' });
   }
 
@@ -62,17 +65,7 @@ export function lintScad(source: string): LintIssue[] {
   // 5. 顶层变量重复赋值（last-wins 警告）
   const topLevel = new Map<string, number>();
   let depth = 0;
-  let inBlockComment = false;
-  for (const line of source.split('\n')) {
-    const code = line.replace(/\/\/.*$/, '');
-    if (inBlockComment) {
-      if (code.includes('*/')) inBlockComment = false;
-      continue;
-    }
-    if (code.trim().startsWith('/*')) {
-      if (!code.includes('*/')) inBlockComment = true;
-      continue;
-    }
+  for (const code of codeOnly.split('\n')) {
     for (const ch of code) {
       if (ch === '{' || ch === '(') depth++;
       else if (ch === '}' || ch === ')') depth--;
