@@ -7,7 +7,7 @@
 **仓库 / Repository**: https://github.com/VitasGuo/ParametricModelMakerPlugin4SM_orca<br>
 **开发者 / Developer**: VitasGuo · **许可证 / License**: [GPL-2.0-only](LICENSE)
 
-> **Beta 预览版 / Beta preview — v0.7.0-beta.4**
+> **Beta 预览版 / Beta preview — v0.7.0-beta.5**
 > 核心建模链路与 65 个范例已通过真实引擎 + 结构审计回归；插件安装脚本与各家 AI Provider 的兼容性仍在收集反馈，接口和范例可能继续调整。
 > The core modeling pipeline and all 65 examples pass real-engine and mesh-audit regression. The installer and provider compatibility are still collecting feedback; APIs and examples may change.
 
@@ -35,7 +35,8 @@ Every model is compiled for real by OpenSCAD WASM inside the browser (not by an 
 - **自然语言建模 / Natural-language modeling**：用一句话描述想要的模型，AI 生成或修改 OpenSCAD 源码。<br>Describe the model you want in one sentence; the AI writes or edits the OpenSCAD source.
 - **对话参考图 / Reference images in chat**：输入框可添加最多 3 张参考图（按钮 / 粘贴 / 拖拽），浏览器内压缩后随消息发给视觉模型；纯文本模型会明确提示看不到图片。<br>Attach up to 3 reference images to a chat message (button / paste / drag-and-drop); they are compressed in the browser and sent to vision models, while text-only models get an explicit "cannot see images" note.
 - **标准件模块库 / Standard parts library**：公制螺纹螺栓、螺母、螺钉过孔、垫圈做成经过装配校验的 SCAD 模块，AI 直接调用而不是每次重画牙型；螺栓螺母用布尔交集验证 0.3mm 间隙能拧进去。<br>Metric threaded bolts, nuts, screw clearance holes, and washers ship as assembly-tested SCAD modules; the AI calls them instead of redrawing thread profiles, and a boolean-intersection test proves a 0.3mm-clearance nut can be screwed on.
-- **齿轮与特征级尺寸核验 / Gears & feature-level dimension checks**：渐开线齿轮模块（模数 / 齿数 / 压力角 20°，中心距 = m(z1+z2)/2）；AI 可在输出里声明 `part_spec`（孔径 / 牙距 / 齿数 / 中心距 / 整体尺寸），引擎对真实网格做射线测量，超差就带着实测值打回重抽。<br>An involute gear module (module / tooth count / 20° pressure angle, center distance = m(z1+z2)/2); the AI may declare a `part_spec` (bore, thread pitch, tooth count, center distance, overall size), which the engine verifies by ray-casting the real mesh — deviations are fed back as measured values for a retry.
+- **齿轮与特征级尺寸核验 / Gears & feature-level dimension checks**：渐开线齿轮模块（模数 / 齿数 / 压力角 20°，中心距 = m(z1+z2)/2）；AI 可在输出里声明 `part_spec`（孔径 / 牙距 / 齿数 / 中心距 / 整体尺寸 / 独立件数），引擎对真实网格做射线测量，超差就带着实测值打回重抽。<br>An involute gear module (module / tooth count / 20° pressure angle, center distance = m(z1+z2)/2); the AI may declare a `part_spec` (bore, thread pitch, tooth count, center distance, overall size, part count), which the engine verifies by ray-casting the real mesh — deviations are fed back as measured values for a retry.
+- **装配体与分件导出 / Assemblies & per-part export**：多个零件并列摆放时按共享顶点自动拆成独立实体，逐件显示尺寸 / 体积 / 面数并可单独或批量导出 STL，方便一件件切片打印；提示词要求零件间留 ≥0.5mm 间隙，`part_spec` 的 `parts` 检查会核对件数，穿插烘成一件会判失败。<br>When several parts sit side by side, the mesh is split into connected solids by shared vertices; each part shows size / volume / triangle count and can be exported as its own STL (individually or all at once). The prompt requires a ≥0.5mm gap between parts, and the `parts` check verifies the declared part count — parts fused by a boolean union fail the check.
 - **真实引擎验证 / Real-engine verification**：每次生成都用 OpenSCAD WASM 编译；语法错误、空模型、尺寸异常会被打回重试。<br>Every generation is compiled with OpenSCAD WASM; syntax errors, empty models, and abnormal dimensions are rejected and retried.
 - **参数面板 / Parameter panel**：按 Customizer 注释自动生成滑杆、枚举、开关、颜色控件，参数通过 `-D` 覆盖，不改写源码。<br>Sliders, enums, checkboxes, and color controls are generated from Customizer annotations; parameters are applied via `-D` overrides without rewriting the source.
 - **3D 预览 / 3D preview**：Three.js Z-up 视图，等轴、正、顶、右视角、线框、截图。<br>Three.js Z-up viewer with iso / front / top / right views, wireframe, and screenshots.
@@ -44,7 +45,7 @@ Every model is compiled for real by OpenSCAD WASM inside the browser (not by an 
 - **图片转像素画 / Image to pixel art**：选一张图，浏览器内降采样成像素网格，自动生成 OpenSCAD 源码（分层浮雕或拼豆空心珠），像素数据编码进字符串常量，不依赖任何外部文件。<br>Pick an image and it is downsampled to a pixel grid in the browser, then turned into OpenSCAD source (layered relief or hollow beads); the pixel data is encoded as a string constant, so no external files are needed.
 - **批量变体 / Batch variants**：一次生成多组参数，并排编译、缩略图预览、单组应用、全部导出 STL。<br>Generate multiple parameter sets at once, compiled side by side with thumbnail previews; apply one set or export all of them as STL.
 - **形状审核 / Shape review**：主模型支持图片输入时（SenseNova 6.8、GLM-4V、GPT-4o、Claude、Gemini 等），自动把 ISO / FRONT / TOP 三视图发给它判断形状；纯文本模型退化为网格摘要加设计计划。<br>When the main model accepts images (SenseNova 6.8, GLM-4V, GPT-4o, Claude, Gemini, etc.), ISO / FRONT / TOP views are sent for shape checking; text-only models fall back to a mesh summary plus a design plan.
-- **导出 / Export**：STL、3MF、`.scad`（含当前参数值）、项目 JSON。<br>STL, 3MF, `.scad` (with current parameter values baked in), and project JSON.
+- **导出 / Export**：STL、3MF、分件 STL（装配体逐件）、`.scad`（含当前参数值）、项目 JSON。<br>STL, 3MF, per-part STL for assemblies, `.scad` (with current parameter values baked in), and project JSON.
 - **中英双语 / Bilingual UI**：顶栏一键切换，保留当前项目与编译状态。<br>One-click language switching from the top bar, keeping the current project and compile state.
 - **本地 AI 代理 / Local AI proxy**：内置 Node 中继（`127.0.0.1:17329`），解决 SenseNova、GLM、OpenAI 的浏览器 CORS 限制。<br>A built-in Node relay (`127.0.0.1:17329`) that works around the browser CORS limits of SenseNova, GLM, and OpenAI.
 - **macOS 风格顶栏 / macOS-style top bar**：左侧菜单（文件 / 视图 / 帮助）加「保存 / 历史 / 导出」三个按钮，项目名居中，右侧状态。<br>Left menus (File / View / Help) plus Save / History / Export buttons, a centered project name, and status on the right.
@@ -163,9 +164,9 @@ npm run orca:proxy
 ```
 ParametricModelMakerPlugin4SM_orca/
 ├── src/
-│   ├── core/                 # types / scad-parser / lint / prompts / examples / part-spec（射线尺寸核验）/ logger
+│   ├── core/                 # types / scad-parser / lint / prompts / examples / part-spec（射线尺寸核验）/ mesh-parts（装配体分件）/ logger
 │   ├── tools/                # image-grid.ts：图片 → 像素网格 → SCAD / image → pixel grid → SCAD
-│   ├── knowledge/            # 知识库：environment.ts（运行环境硬限制）+ workflow.ts（工作流程）+ rules.ts（编号硬约束）+ parts.ts（标准件模块）+ gears.ts（渐开线齿轮）/ knowledge base: runtime limits, workflow, numbered rules, standard parts, involute gears
+│   ├── knowledge/            # 知识库：environment.ts（运行环境硬限制）+ workflow.ts（工作流程）+ rules.ts（编号硬约束）+ parts.ts（标准件模块）+ gears.ts（渐开线齿轮）+ assembly.ts（装配体与分件）/ knowledge base: runtime limits, workflow, numbered rules, standard parts, involute gears, assemblies
 │   ├── engine/
 │   │   ├── openscad.worker.ts  # WASM 编译 Worker（一次性实例）/ WASM compile worker (one-shot instance)
 │   │   ├── compiler.ts         # 主线程编译 API（超时 / 并发）/ main-thread compile API (timeout / concurrency)
@@ -176,7 +177,7 @@ ParametricModelMakerPlugin4SM_orca/
 │   ├── ai/                   # provider / config / pipeline / verify
 │   ├── state/                # Store（源码、参数、编译、对话）/ store (source, parameters, compile, chat)
 │   ├── storage/              # 项目持久化、代码历史、字体与下载 / project persistence, code history, fonts, downloads
-│   ├── ui/                   # 布局、对话、参数、范例、设置、历史、日志、关于 / layout, chat, params, examples, settings, history, logs, about
+│   ├── ui/                   # 布局、对话、参数、范例、设置、历史、分件导出、日志、关于 / layout, chat, params, examples, settings, history, part export, logs, about
 │   ├── i18n.ts               # 中英文 DOM 翻译（无重载切换）/ zh-en DOM translation (hot switch, no reload)
 │   ├── version.ts            # 构建时注入的版本与作者 / version & author injected at build time
 │   └── styles/app.css

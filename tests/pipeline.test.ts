@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AiRequest } from '../src/core/types.js';
 import type { VerifyOutcome } from '../src/ai/verify.js';
 import type { WebModelConfig } from '../src/ai/providers.js';
+import type { PartCheck } from '../src/core/part-spec.js';
 
 const mocks = vi.hoisted(() => ({
   callProvider: vi.fn(),
@@ -150,10 +151,13 @@ describe('chat 动作分派', () => {
       })
       .mockResolvedValueOnce({ text: '{"verdict":"pass","reason":"形状符合"}' });
 
-    const verify = vi.fn(async () => outcome());
+    const verify = vi.fn(
+      async (_source: string, _values: Record<string, string | number | boolean>, _specs?: PartCheck[]) =>
+        outcome()
+    );
     const response = await chat(request(), CFG, verify);
     expect(response.verification?.status).toBe('passed');
-    const specs = verify.mock.calls[0]![2];
+    const specs = verify.mock.calls[0]?.[2];
     expect(specs).toHaveLength(1);
     expect(specs?.[0]?.kind).toBe('size');
   });

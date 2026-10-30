@@ -4,9 +4,11 @@
  * AI 在 replaceSource 里可以声明几条"关键尺寸"，这里用真实编译出的网格做射线测量，
  * 把偏差回灌给重抽，避免"说要 M8，孔画成 9mm""说 12 齿，实际 10 齿"这类问题。
  *
- * 只验证可测的东西：整体尺寸、孔径、螺纹牙距、齿轮齿数、双轴中心距。
+ * 只验证可测的东西：整体尺寸、孔径、螺纹牙距、齿轮齿数、双轴中心距、独立实体数。
  * 表面质量、装配手感不在这里判定（那是视觉审核与实物打印的事）。
  */
+
+import { analyzeMeshParts } from './mesh-parts.js';
 
 export type SpecAxis = 'x' | 'y' | 'z';
 type Vec3 = [number, number, number];
@@ -22,7 +24,9 @@ export type PartCheck =
   /** 齿数：在分度圆半径上绕一圈采样，数"实体区"的连通段数。 */
   | { kind: 'teeth'; at: Vec3; radius: number; count: number }
   /** 双轴中心距：两轴距离 + 两处都必须是通透轴孔。 */
-  | { kind: 'center'; a: Vec3; b: Vec3; distance: number; tol?: number };
+  | { kind: 'center'; a: Vec3; b: Vec3; distance: number; tol?: number }
+  /** 独立实体数：按共享顶点分件，装配体用来核对"应该有几件"。 */
+  | { kind: 'parts'; count: number };
 
 export interface SpecCheckResult {
   label: string;
@@ -48,6 +52,7 @@ const DEFAULT_TOL: Record<PartCheck['kind'], number> = {
   pitch: 0.15,
   teeth: 0,
   center: 0.5,
+  parts: 0,
 };
 
 /** 单次核验最多接受的检查条数，防止模型刷屏。 */
@@ -107,6 +112,11 @@ function normalizeOne(raw: unknown): PartCheck | null {
       if (!a || !b || !distance) return null;
       return { kind: 'center', a, b, distance, ...(tol ? { tol } : {}) };
     }
+    case 'parts': {
+      const count = Math.round(Number(o.count));
+      if (!Number.isFinite(count) || count <= 0 || count > 500) return null;
+      return { kind: 'parts', count };
+    }
     default:
       return null;
   }
@@ -128,9 +138,15 @@ function vec3(value: unknown): Vec3 | null {
 export function measurePartSpecs(buffer: ArrayBuffer, checks: PartCheck[]): SpecReport {
   const mesh = loadMesh(buffer);
   const results: SpecCheckResult[] = [];
+  // 分件统计要建顶点索引，只在声明了 parts 检查时才做
+  let partCount: number | null | undefined;
+  const resolvePartCount = (): number | null => {
+    if (partCount === undefined) partCount = analyzeMeshParts(buffer)?.length ?? null;
+    return partCount;
+  };
   for (const check of checks) {
     try {
-      results.push(...measureOne(mesh, check));
+      results.push(...measureOne(mesh, check, resolvePartCount));
     } catch {
       // 单条检查出错不影响其余条目
     }
@@ -167,7 +183,11 @@ function fmt(n: number): string {
 
 // ───────────────────────── 单条检查 ─────────────────────────
 
-function measureOne(mesh: TriangleSoup, check: PartCheck): SpecCheckResult[] {
+function measureOne(
+  mesh: TriangleSoup,
+  check: PartCheck,
+  partCount: () => number | null
+): SpecCheckResult[] {
   switch (check.kind) {
     case 'size': {
       const tol = check.tol ?? DEFAULT_TOL.size;
@@ -241,6 +261,24 @@ function measureOne(mesh: TriangleSoup, check: PartCheck): SpecCheckResult[] {
           tol,
           ok: Math.abs(measured - check.distance) <= tol && boreA && boreB,
           ...(note ? { note } : {}),
+        },
+      ];
+    }
+    case 'parts': {
+      const measured = partCount();
+      const mismatch = measured !== null && measured !== check.count;
+      return [
+        {
+          label: '独立实体数',
+          expected: check.count,
+          measured,
+          tol: 0,
+          ok: measured === check.count,
+          ...(measured === null
+            ? { note: '网格超过 30 万三角形或无法解析，未做分件统计' }
+            : mismatch
+              ? { note: '相互穿插的零件会被布尔并集烘成一件；零件间要留 ≥0.5mm 间隙' }
+              : {}),
         },
       ];
     }

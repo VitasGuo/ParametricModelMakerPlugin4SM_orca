@@ -34,9 +34,11 @@ describe('normalizePartSpecs', () => {
       { kind: 'bogus' },
       'not-an-object',
       { kind: 'size', expect: [10, 20, 5] },
+      { kind: 'parts', count: 2 },
+      { kind: 'parts', count: 0 }, // 件数必须为正
     ]);
-    expect(cleaned).toHaveLength(3);
-    expect(cleaned.map((c) => c.kind)).toEqual(['hole', 'teeth', 'size']);
+    expect(cleaned).toHaveLength(4);
+    expect(cleaned.map((c) => c.kind)).toEqual(['hole', 'teeth', 'size', 'parts']);
   });
 
   it('非数组输入返回空列表', () => {

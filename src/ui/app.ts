@@ -37,6 +37,8 @@ import { openHistoryModal } from './history.js';
 import { openImageImportModal } from './image-import.js';
 import { openLogsModal } from './logs.js';
 import { openAboutModal } from './about.js';
+import { openPartsModal } from './parts.js';
+import { splitMeshParts } from '../core/mesh-parts.js';
 import { toast } from './toast.js';
 
 export class App {
@@ -93,6 +95,7 @@ export class App {
         { label: '历史版本…', action: () => this.openHistory() },
         'divider',
         { label: '导出 STL', action: () => this.exportStl() },
+        { label: '分件导出…', action: () => this.openPartsExport() },
         { label: '导出 3MF', action: () => void this.export3mf() },
         { label: '导出 .scad（含当前参数）', action: () => this.exportScad() },
         { label: '导出项目 JSON', action: () => downloadProjectJson(this.store.state.project) },
@@ -679,6 +682,25 @@ export class App {
     downloadArrayBuffer(output, filename, 'model/stl');
     logger.info('export', '导出 STL', filename);
     toast('STL 已开始下载');
+  }
+
+  private openPartsExport(): void {
+    const output = this.store.state.compile?.ok ? this.store.state.compile.output : undefined;
+    if (!output) {
+      toast('当前没有可导出的网格，请先编译成功', 'error');
+      return;
+    }
+    const split = splitMeshParts(output);
+    if (!split) {
+      toast('网格超过 30 万三角形或不是二进制 STL，无法分件', 'error');
+      return;
+    }
+    logger.info('export', '分件导出', `${split.parts.length} 件`);
+    openPartsModal({
+      parts: split.parts,
+      stls: split.stls,
+      baseName: safeName(this.store.state.project.name),
+    });
   }
 
   private async export3mf(): Promise<void> {

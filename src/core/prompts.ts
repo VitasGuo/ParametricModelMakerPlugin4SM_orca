@@ -12,6 +12,7 @@ import { examplesToPromptText } from './examples.js';
 import { rulesToPromptText } from '../knowledge/rules.js';
 import { PARTS_LIBRARY } from '../knowledge/parts.js';
 import { GEARS_LIBRARY } from '../knowledge/gears.js';
+import { ASSEMBLY_LIBRARY } from '../knowledge/assembly.js';
 import { WORKFLOW } from '../knowledge/workflow.js';
 import { ENVIRONMENT } from '../knowledge/environment.js';
 
@@ -37,7 +38,8 @@ export const OUTPUT_SCHEMA = `{
       { "kind": "hole", "at": [x, y, z], "axis": "z", "diameter": 8 },
       { "kind": "pitch", "at": [x, y, z], "radius": 3.66, "pitch": 1.25 },
       { "kind": "teeth", "at": [x, y, z], "radius": 20, "count": 20 },
-      { "kind": "center", "a": [x1, y1, z], "b": [x2, y2, z], "distance": 25.2 }
+      { "kind": "center", "a": [x1, y1, z], "b": [x2, y2, z], "distance": 25.2 },
+      { "kind": "parts", "count": 2 }   // 独立实体数（装配体声明件数）
     ],
     // explain 时
     "text": "<给用户看的中文解释>",
@@ -667,6 +669,8 @@ ${PARTS_LIBRARY}
 
 ${GEARS_LIBRARY}
 
+${ASSEMBLY_LIBRARY}
+
 【补充执行细则】
 - 能通过调整已有参数实现的，优先用 updateParams。
 - "再大/再厚/再高一点"这类模糊意图，结合当前参数值给出 ±10%~30% 的变化。
@@ -677,6 +681,7 @@ ${GEARS_LIBRARY}
 - 复杂模型是优势：机构、装配体、多层结构都支持，用 module 拆分，代码写到 600 行以上也没问题。
 - 机械紧固/传动件先查「九、标准件模块库」：螺纹/螺母直接用 std_bolt / std_nut，不要重画牙型。
 - 齿轮用「十、齿轮模块库」的 spur_gear，中心距按 m(z1+z2)/2 算；关键尺寸能算出来就写进 part_spec（3~8 条）。
+- 装配体按「十一、装配体与分件」：每个零件一个 module，并列摆开留 ≥0.5mm 间隙，件数写进 part_spec 的 parts 检查。
 - 生成后必须对照「七、常见错误清单」与「八、结构正确性（硬）与工艺参考（软）」自检，确认无误再输出。`;
 }
 
