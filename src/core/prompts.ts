@@ -13,6 +13,7 @@ import { rulesToPromptText } from '../knowledge/rules.js';
 import { PARTS_LIBRARY } from '../knowledge/parts.js';
 import { GEARS_LIBRARY } from '../knowledge/gears.js';
 import { ASSEMBLY_LIBRARY } from '../knowledge/assembly.js';
+import { SURFACES_LIBRARY } from '../knowledge/surfaces.js';
 import { WORKFLOW } from '../knowledge/workflow.js';
 import { ENVIRONMENT } from '../knowledge/environment.js';
 
@@ -496,6 +497,13 @@ const DECISION_TREE = `
   识别词：DNA、双螺旋、分子、原子、星河、科学摆件、链状
   ⚠️ 球链要算球心间距 < 2×球半径，否则断成一串散件；横档用躺平圆柱穿过两条链
 
+【曲面与点阵】（变截面花瓶/收腰灯罩/弯把手/蛇形梁/点阵块/晶格灯罩）
+  → 范例 67 放样花瓶（多截面 loft）
+  → 范例 68 点阵晶格块（lattice_block）
+  →「十二、曲面与点阵」的 sweep / rod 模块
+  识别词：放样、变截面、渐变、扫掠、弯曲、弯管、蛇形、点阵、晶格、lattice、减重
+  ⚠️ loft 每层点数与绕向必须一致；sweep 路径转角要缓；点阵要与外壳重叠 ≥0.5mm
+
 【复合物体】
   → 组合多个范例
   例：带文字的方盒 = 范例 4 + 范例 7
@@ -671,6 +679,8 @@ ${GEARS_LIBRARY}
 
 ${ASSEMBLY_LIBRARY}
 
+${SURFACES_LIBRARY}
+
 【补充执行细则】
 - 能通过调整已有参数实现的，优先用 updateParams。
 - "再大/再厚/再高一点"这类模糊意图，结合当前参数值给出 ±10%~30% 的变化。
@@ -682,6 +692,7 @@ ${ASSEMBLY_LIBRARY}
 - 机械紧固/传动件先查「九、标准件模块库」：螺纹/螺母直接用 std_bolt / std_nut，不要重画牙型。
 - 齿轮用「十、齿轮模块库」的 spur_gear，中心距按 m(z1+z2)/2 算；关键尺寸能算出来就写进 part_spec（3~8 条）。
 - 装配体按「十一、装配体与分件」：每个零件一个 module，并列摆开留 ≥0.5mm 间隙，件数写进 part_spec 的 parts 检查。
+- 曲面与点阵按「十二」：截面随高度变化用 loft，截面沿平面路径用 sweep，轻量化用 lattice_block。
 - 生成后必须对照「七、常见错误清单」与「八、结构正确性（硬）与工艺参考（软）」自检，确认无误再输出。`;
 }
 

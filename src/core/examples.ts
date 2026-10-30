@@ -11,6 +11,7 @@
 
 import { PARTS_CODE } from '../knowledge/parts.js';
 import { GEARS_CODE } from '../knowledge/gears.js';
+import { SURFACES_CODE } from '../knowledge/surfaces.js';
 
 /** 范例难度层级。 */
 export type ExampleLevel = 'basic' | 'classic' | 'advanced';
@@ -3610,6 +3611,108 @@ translate([2 * tip_a + part_gap + tip_b, 0, 0])
   spur_gear(teeth_b, module_m, gear_thickness, bore_d);
 `,
   },
+  {
+    id: 67,
+    name: '放样花瓶（多截面）',
+    category: '曲面与点阵',
+    level: 'advanced',
+    applies: '变截面花瓶、收腰灯罩、渐变笔筒、曲面底座等"每一层轮廓都不同"的物体',
+    idea: '把同一组圆角矩形控制点按不同缩放比例摆在不同高度，用 polyhedron 把相邻两层缝成曲面；外层均匀放大、内层整体缩小 2×壁厚，两件相减即得均匀壁厚的中空瓶',
+    points: [
+      '每层截面用同一个 round_pts 点列缩放得到，点数与绕向完全一致，这是 loft 能封面的前提',
+      '层序从下到上，sect(profile, z, s) 的 z 递增；首尾两层自动封盖，所以是封闭实体',
+      '瓶腹最宽处 belly > 1，瓶颈 neck < 1；两者决定"鼓腹收颈"的造型，别把 neck 设到 0.1 以下',
+      '内层从 floor_t 起、到 height+2 止：起点留出瓶底厚度，终点高出瓶口才能把顶盖切穿',
+      '内层截面 = 外层尺寸 - 2×wall；壁厚由差值保证，不要靠目测缩放',
+      '壁厚 2~3mm、瓶底 4~6mm 是 FDM 的稳妥区间；太薄会透光露层纹',
+    ],
+    code: `${SURFACES_CODE}
+
+/* [瓶体] */
+height = 180; // [80:10:300]
+width = 72; // [30:5:160]
+depth = 72; // [30:5:160]
+belly = 1.18; // [0.9:0.02:1.4]
+neck = 0.6; // [0.3:0.02:0.95]
+corner_r = 16; // [4:1:30]
+
+/* [壁厚] */
+wall = 2.4; // [1.2:0.2:6]
+floor_t = 4; // [2:0.5:10]
+
+/* [Hidden] */
+$fn = 48;
+n = 5;
+
+// 造型曲线：高度比例 f → 缩放系数（0=底、1=口）
+function level_scale(f) =
+  lookup(f, [[0, 1], [0.28, 0.94], [0.48, belly], [0.72, (belly + neck) / 2], [1, neck]]);
+
+function outer_pts(f) =
+  round_pts(width * level_scale(f), depth * level_scale(f), max(corner_r * level_scale(f), 1), n);
+
+// 内层不是"整体缩小"：每一层按该层外轮廓内缩 2×wall，壁厚才是常数
+function inner_pts(f) =
+  let (s = level_scale(f))
+    round_pts(max(width * s - 2 * wall, 4), max(depth * s - 2 * wall, 4),
+              max(corner_r * s - wall, 1), n);
+
+outer = [for (f = [0, 0.28, 0.48, 0.72, 1]) [height * f, outer_pts(f)]];
+
+// 内层从 floor_t 起、到 height+2 止：起点留瓶底厚度，终点高出口部才能切穿顶盖
+inner = [for (z = [floor_t, height * 0.28, height * 0.48, height * 0.72, height, height + 2])
+           [z, inner_pts(min(z, height) / height)]];
+
+difference() {
+  loft(outer);
+  loft(inner);
+}
+`,
+  },
+  {
+    id: 68,
+    name: '点阵晶格块',
+    category: '曲面与点阵',
+    level: 'advanced',
+    applies: '轻量化点阵块、晶格灯罩、透气减重夹芯、桌面晶格摆件',
+    idea: '立方晶格用 rod 在相邻节点之间连圆杆，每个节点补一颗同半径球让杆件实重叠；整体与立方体求交，边界被切平，底面自然贴床',
+    points: [
+      '节点球是流形的关键：圆柱端点若只靠一条边相接，union 后会出现非流形开放边',
+      'lattice_block 最后用 intersection 裁到精确尺寸，边界杆件被切平，minZ 正好 0',
+      'cell 取 8~20mm、strut 取 cell 的 12%~20%：太细会断，太粗就接近实心',
+      'diag 打开后每格加 4 条体对角线，刚度更高、面数也翻倍；灯罩/摆件用 true 更好看',
+      '点阵块要与外壳或底板重叠 ≥0.5mm，只靠点接触会被算成两个实体',
+      '千层饼式的杆件很吃面数：cell 每缩小一半，杆数约变 8 倍，先算再调',
+    ],
+    code: `${SURFACES_CODE}
+
+/* [点阵块] */
+size_x = 60; // [20:5:150]
+size_y = 60; // [20:5:150]
+size_z = 60; // [20:5:150]
+cell = 12; // [8:1:30]
+strut_d = 2.4; // [1:0.2:6]
+diag = true;
+
+/* [外框] */
+frame = 0; // [0:1:8]
+
+/* [Hidden] */
+$fn = 32;
+
+// 点阵本体：贴在 z=0，与边界求交后尺寸精确
+lattice_block([size_x, size_y, size_z], cell, strut_d / 2, diag);
+
+// 外框：四壁留 frame 厚，上下开口；与点阵边界杆件重叠成一个实体
+if (frame > 0) {
+  difference() {
+    cube([size_x, size_y, size_z]);
+    translate([frame, frame, -1])
+      cube([size_x - 2 * frame, size_y - 2 * frame, size_z + 2]);
+  }
+}
+`,
+  },
 ];
 
 /** 全部分类（按首个出现顺序）。 */
@@ -3620,12 +3723,13 @@ export const EXAMPLE_CATEGORIES: string[] = [...new Set(EXAMPLES.map((e) => e.ca
  *
  * 选取标准：模板复用率高、技巧不可替代，且每个大类至少保留 1 个。
  * 其余范例在 prompt 里只保留「名称 + 适用 + 思路」的目录条目——模型知道
- * 这类东西有解、知道思路，但不必把 67 份源码全文塞进上下文。
+ * 这类东西有解、知道思路，但不必把 68 份源码全文塞进上下文。
+ * 螺旋楼梯（64）、六边形壁架（51）等技巧与其它范例重复的只留目录条目。
  * 源码仍然完整地留在 UI 范例库，用户一键即可载入。
  */
 export const PROMPT_FULL_IDS: readonly number[] = [
   1, 2, 3, 3.5, 6, 7, 10, 11, 16, 17, 20, 22, 30,
-  37, 41, 49, 51, 54, 57, 58, 59, 60, 62, 63, 64, 66,
+  37, 41, 49, 54, 57, 58, 59, 60, 62, 63, 66,
 ];
 
 const PROMPT_FULL = new Set(PROMPT_FULL_IDS);
