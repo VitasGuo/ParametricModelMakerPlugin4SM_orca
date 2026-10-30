@@ -121,17 +121,35 @@ export class App {
     const topbar = el('div', 'topbar', [
       el('div', 'brand', [brandIcon, el('span', 'brand-name', ['AI 参数化模型'])]),
       menuBar,
-      el('div', 'topbar-actions', [
-        button('保存', 'btn btn-sm', () => this.saveCurrent()),
-        button('历史', 'btn btn-sm btn-ghost', () => this.openHistory()),
-        button('导出', 'btn btn-sm btn-ghost', () => this.exportStl()),
-      ]),
       el('div', 'topbar-center', [this.projectName]),
       el('div', 'topbar-group', [
         this.configBadge,
         this.statusBadge,
         langBtn,
         iconButton('gear', '设置', () => this.openSettings()),
+      ]),
+    ]);
+
+    // ---------- ribbon：常驻工具栏（Office 式，常用操作单击可达） ----------
+    const ribbon = el('div', 'ribbon', [
+      el('div', 'ribbon-group', [
+        ribbonButton('新建', '新建项目', () => this.newProject()),
+        ribbonButton('打开', '打开已保存的项目（Ctrl/⌘ + O）', () => this.openProjects()),
+        ribbonButton('保存', '保存项目（Ctrl/⌘ + S）', () => this.saveCurrent()),
+        ribbonButton('历史', '历史版本', () => this.openHistory()),
+        ribbonButton('快照', '保存当前版本到历史', () => this.snapshotCurrent()),
+      ]),
+      el('span', 'ribbon-sep'),
+      el('div', 'ribbon-group', [
+        ribbonButton('图片转像素画', '从图片生成像素画', () => this.openImageImport()),
+      ]),
+      el('span', 'ribbon-sep'),
+      el('div', 'ribbon-group', [
+        ribbonButton('导出 STL', '导出 STL', () => this.exportStl(), true),
+        ribbonButton('分件导出', '按零件导出 STL（装配体）', () => this.openPartsExport()),
+        ribbonButton('3MF', '导出 3MF', () => void this.export3mf()),
+        ribbonButton('SCAD', '导出 .scad（含当前参数）', () => this.exportScad()),
+        ribbonButton('JSON', '导出项目 JSON', () => downloadProjectJson(this.store.state.project)),
       ]),
     ]);
 
@@ -195,7 +213,7 @@ export class App {
       el('span', 'statusbar-sep', ['·']),
       repoLink,
     ]);
-    root.append(topbar, main, footer);
+    root.append(el('div', 'header', [topbar, ribbon]), main, footer);
 
     // 快捷键：Ctrl/Cmd + S 保存项目，Ctrl/Cmd + O 打开项目
     document.addEventListener('keydown', (event) => {
@@ -784,6 +802,13 @@ export class App {
 }
 
 type MenuItem = { label: string; action: () => void } | 'divider';
+
+/** 工具栏按钮：短标签 + tooltip，primary 用主色（导出 STL）。 */
+function ribbonButton(label: string, title: string, onClick: () => void, primary = false): HTMLButtonElement {
+  const b = button(label, primary ? 'btn btn-sm' : 'btn btn-sm btn-ghost', onClick);
+  b.title = title;
+  return b;
+}
 
 function buildMenu(label: string, items: MenuItem[]): HTMLElement {
   const menu = el('div', 'menu');

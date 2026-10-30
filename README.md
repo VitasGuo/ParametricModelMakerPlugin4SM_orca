@@ -7,7 +7,7 @@
 **仓库 / Repository**: https://github.com/VitasGuo/ParametricModelMakerPlugin4SM_orca<br>
 **开发者 / Developer**: VitasGuo · **许可证 / License**: [GPL-2.0-only](LICENSE)
 
-> **Beta 预览版 / Beta preview — v0.7.0-beta.6**
+> **Beta 预览版 / Beta preview — v0.7.0-beta.7**
 > 核心建模链路与 67 个范例已通过真实引擎 + 结构审计回归；插件安装脚本与各家 AI Provider 的兼容性仍在收集反馈，接口和范例可能继续调整。
 > The core modeling pipeline and all 67 examples pass real-engine and mesh-audit regression. The installer and provider compatibility are still collecting feedback; APIs and examples may change.
 
@@ -49,9 +49,10 @@ Every model is compiled for real by OpenSCAD WASM inside the browser (not by an 
 - **导出 / Export**：STL、3MF、分件 STL（装配体逐件）、`.scad`（含当前参数值）、项目 JSON。<br>STL, 3MF, per-part STL for assemblies, `.scad` (with current parameter values baked in), and project JSON.
 - **中英双语 / Bilingual UI**：顶栏一键切换，保留当前项目与编译状态。<br>One-click language switching from the top bar, keeping the current project and compile state.
 - **本地 AI 代理 / Local AI proxy**：内置 Node 中继（`127.0.0.1:17329`），解决 SenseNova、GLM、OpenAI 的浏览器 CORS 限制。<br>A built-in Node relay (`127.0.0.1:17329`) that works around the browser CORS limits of SenseNova, GLM, and OpenAI.
-- **macOS 风格顶栏 / macOS-style top bar**：左侧菜单（文件 / 视图 / 帮助）加「保存 / 历史 / 导出」三个按钮，项目名居中，右侧状态。<br>Left menus (File / View / Help) plus Save / History / Export buttons, a centered project name, and status on the right.
+- **Office 式常驻工具栏 / Office-style quick toolbar**：顶栏菜单（文件 / 视图 / 帮助）下方是一条常驻工具栏：新建 / 打开 / 保存 / 历史 / 快照、图片转像素画、导出 STL / 分件导出 / 3MF / SCAD / JSON 全部一键直达；窄屏时整条工具栏横向滚动而不挤压主界面。<br>Below the File / View / Help menu bar sits a persistent toolbar: New / Open / Save / History / Snapshot, image-to-pixel-art, and STL / part export / 3MF / SCAD / JSON exports are one click away; on narrow screens the row scrolls horizontally instead of squeezing the workspace.
+- **macOS 风格顶栏 / macOS-style top bar**：左侧菜单（文件 / 视图 / 帮助），项目名居中，右侧状态。<br>Left menus (File / View / Help), a centered project name, and status on the right.
 - **中心视图切换 / Center view switching**：3D 预览与 SCAD 源代码只在中部区域切换，左右聊天、参数面板保持可见；编辑器占满中间高度。<br>The 3D preview and SCAD source switch only in the center area, keeping the chat and parameter panels visible; the editor fills the center height.
-- **历史版本 / History**：AI 生成、载入范例、图片导入、保存项目时自动命名并快照源码；顶栏「历史」按钮随时打开，每条可直接展开查看源码，也可载入、导出或删除。<br>AI generations, example loads, image imports, and project saves are auto-named and snapshotted; the top-bar History button opens the list anytime, where each entry can be expanded to read its source, restored, exported, or deleted.
+- **历史版本 / History**：AI 生成、载入范例、图片导入、保存项目时自动命名并快照源码；工具栏「历史」按钮随时打开，每条可直接展开查看源码，也可载入、导出或删除。<br>AI generations, example loads, image imports, and project saves are auto-named and snapshotted; the toolbar History button opens the list anytime, where each entry can be expanded to read its source, restored, exported, or deleted.
 - **运行日志 / Logs**：编译、AI 调用、导出、设置等事件写入本机环形日志，可在「帮助 → 运行日志」查看、复制、导出。<br>Compile, AI, export, and settings events are written to a local ring buffer, viewable, copyable, and exportable via "Help → Logs".
 - **版本、作者、仓库 / Version, author, repo**：底部状态栏显示版本、开发者、许可证与 GitHub 链接，帮助菜单可查看关于信息。<br>The bottom status bar shows version, developer, license, and the GitHub link; the Help menu has an About dialog.
 - **纯静态 + BYOK**：无后端，API Key 明文保存在本机浏览器 localStorage（风险自负）。<br>No backend; the API key is stored in plain text in the browser's localStorage on your machine (at your own risk).
