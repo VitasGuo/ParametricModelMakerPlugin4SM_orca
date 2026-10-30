@@ -98,3 +98,24 @@ export function analyzeMesh(buffer: ArrayBuffer): MeshStructure {
 
   return { triangles: count, components: sizes.length, sizes, openEdges, minZ, maxZ };
 }
+
+/** 有符号四面体体积求和（取绝对值），用于装配间隙/碰撞量测试。 */
+export function meshVolumeMm3(buffer: ArrayBuffer): number {
+  const view = new DataView(buffer);
+  const count = view.getUint32(80, true);
+  let volume = 0;
+  for (let i = 0; i < count; i += 1) {
+    const base = 84 + i * 50;
+    const p: number[][] = [0, 1, 2].map((k) => {
+      const o = base + 12 + k * 12;
+      return [view.getFloat32(o, true), view.getFloat32(o + 4, true), view.getFloat32(o + 8, true)];
+    });
+    const [a, b, c] = p as [number[], number[], number[]];
+    volume +=
+      (a[0]! * (b[1]! * c[2]! - b[2]! * c[1]!) -
+        a[1]! * (b[0]! * c[2]! - b[2]! * c[0]!) +
+        a[2]! * (b[0]! * c[1]! - b[1]! * c[0]!)) /
+      6;
+  }
+  return Math.abs(volume);
+}

@@ -9,6 +9,8 @@
  * OpenSCAD WASM 编译 + tests/examples-real-engine.test.ts 结构审计回归。
  */
 
+import { PARTS_CODE } from '../knowledge/parts.js';
+
 /** 范例难度层级。 */
 export type ExampleLevel = 'basic' | 'classic' | 'advanced';
 
@@ -509,67 +511,40 @@ translate([0, 0, outer_r])
   },
   {
     id: 9,
-    name: '螺旋螺纹螺栓',
+    name: 'M8 螺栓螺母套件（可拧）',
     category: '球体与螺纹',
     level: 'advanced',
-    applies: '螺纹件、螺母、螺栓、瓶盖、需要真实螺旋升角的结构',
-    idea: '把螺纹剖面（径向×轴向的矩形）用 rotate_extrude 切成 10° 小段，每段转 10°、升高 pitch/36，逐段叠成一个真实的螺旋牙；下面是六角螺栓头，中心是螺杆芯',
+    applies: '功能螺纹、紧固件、需要真正拧进去的螺栓螺母、M3~M12 标准件',
+    idea: '同一套梯形牙螺旋：螺栓用原尺寸，螺母把同一螺旋径向和轴向各放大 clearance 后当刀具挖掉，因此牙型成对、一定能拧',
     points: [
-      '螺纹是"小段旋转 + 逐段抬升"的螺旋：seg_angle = 360/36，seg_lift = pitch/36',
-      '每段 rotate_extrude 多扫 12%，段与段在角度上重叠，接缝不会出现缺口',
-      '牙高 thread_height 要小于 pitch，否则相邻两圈会粘在一起，看着就是个柱子',
-      '牙顶到牙底 thread_depth 决定螺纹多"咬"进螺杆芯；螺杆芯半径 = 外半径 - 牙深',
-      '螺栓头用 $fn=6 的圆柱，天然六角；它同时是整件贴床的底面',
+      '牙型只写一次：thread_ridge 叠 48 段/圈形成右旋螺旋，螺栓和螺母共用',
+      '螺母内螺纹 = 同一螺旋放大 clearance（默认 0.3）后挖掉，径向/轴向间隙都留出来了',
+      '公制粗牙牙距：M3=0.5、M4=0.7、M5=0.8、M6=1.0、M8=1.25、M10=1.5、M12=1.75',
+      '螺纹从螺栓头(z=head_h)起；螺母相位与螺栓对齐时按整牙距平移（不是随便放）',
+      '打印方向：六角头贴床、杆朝上；螺母平放；装配靠拧，不是直插',
+      '这是两件套：螺栓 + 螺母分列摆开，一起打印',
     ],
-    code: `/* [螺栓] */
-outer_diameter = 20; // [10:1:50]
-pitch = 3; // [1:0.5:10]
-turns = 5; // [2:1:20]
-thread_depth = 1.5; // [0.5:0.1:3]
-thread_height = 1.5; // [0.8:0.1:3]
+    code: `${PARTS_CODE}
 
-/* [螺栓头] */
-head_height = 8; // [5:1:20]
+/* [螺栓] */
+bolt_d = 8; // [6:1:12]
+bolt_length = 30; // [16:2:60]
+bolt_pitch = 1.25; // [1:0.25:2]
+head_d = 14; // [10:1:24]
+head_h = 5.3; // [3:0.5:10]
 
-/* [Hidden] */
-$fn = 48;
-seg_per_turn = 36;
-seg_angle = 360 / seg_per_turn;
-seg_lift = pitch / seg_per_turn;
+/* [螺母] */
+nut_thickness = 6.5; // [4:0.5:14]
+nut_outer = 14; // [10:1:24]
+clearance = 0.3; // [0.2:0.05:0.6]
 
-outer_r = outer_diameter / 2;
-inner_r = outer_r - thread_depth;
-thread_len = turns * pitch;
+/* [排布] */
+part_gap = 12; // [6:2:30]
 
-// 螺纹剖面（径向 × 轴向的矩形），绕 Z 扫一小段
-// 内缘故意埋进螺杆芯 0.6mm：贴着圆柱面放会产生共面破面
-module thread_segment() {
-  rotate_extrude(angle = seg_angle * 1.12)
-    polygon(points = [
-      [inner_r - 0.6, 0],
-      [outer_r, 0],
-      [outer_r, thread_height],
-      [inner_r - 0.6, thread_height]
-    ]);
-}
-
-module thread() {
-  for (i = [0 : turns * seg_per_turn - 1])
-    rotate([0, 0, i * seg_angle])
-      translate([0, 0, i * seg_lift])
-        thread_segment();
-}
-
-union() {
-  // 六角螺栓头（贴床）
-  cylinder(h = head_height, r = outer_r + 2, $fn = 6);
-  // 螺杆芯
-  translate([0, 0, head_height])
-    cylinder(h = thread_len + 1, r = inner_r);
-  // 螺旋牙
-  translate([0, 0, head_height])
-    thread();
-}
+translate([0, 0, 0])
+  std_bolt(bolt_d, bolt_length, bolt_pitch, head_d, head_h);
+translate([nut_outer + part_gap, 0, 0])
+  std_nut(bolt_d, bolt_pitch, nut_thickness, nut_outer, clearance);
 `,
   },
   {
@@ -3606,7 +3581,7 @@ export const EXAMPLE_CATEGORIES: string[] = [...new Set(EXAMPLES.map((e) => e.ca
  * 源码仍然完整地留在 UI 范例库，用户一键即可载入。
  */
 export const PROMPT_FULL_IDS: readonly number[] = [
-  1, 2, 3, 3.5, 6, 7, 9, 10, 11, 16, 17, 20, 22, 30,
+  1, 2, 3, 3.5, 6, 7, 10, 11, 16, 17, 20, 22, 30,
   37, 41, 49, 51, 54, 57, 58, 59, 60, 62, 63, 64,
 ];
 

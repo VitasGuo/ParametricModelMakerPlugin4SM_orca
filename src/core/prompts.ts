@@ -10,6 +10,7 @@ import type { AiAction, EditorState, ScadCustomization } from './types.js';
 import { parseCustomizer } from './scad-parser.js';
 import { examplesToPromptText } from './examples.js';
 import { rulesToPromptText } from '../knowledge/rules.js';
+import { PARTS_LIBRARY } from '../knowledge/parts.js';
 import { WORKFLOW } from '../knowledge/workflow.js';
 import { ENVIRONMENT } from '../knowledge/environment.js';
 
@@ -454,8 +455,16 @@ const DECISION_TREE = `
   识别词：蜂窝、减重、镂空板、格栅、散热、透气、六边形孔
   ⚠️ 先 difference 挖孔再考虑边框；孔用 circle(r,$fn=6)，排布列距 1.5r、行距 1.732r
 
+【紧固件与螺纹配合】（螺栓/螺母/螺纹孔/需要真拧的件）
+  → 标准件模块库 std_bolt / std_nut / std_screw_hole（第九章，直接复制）
+  → 范例 9 M8 螺栓螺母套件（拆解件：螺栓 + 螺母）
+  识别词：螺栓、螺母、螺纹、拧、紧固、螺丝、M3、M4、M6、M8、M12
+  ⚠️ 功能螺纹禁止手画牙型；M6 以下 FDM 很难拧，功能件优先 ≥M8
+  ⚠️ 螺母已内置 clearance；装配靠"拧进去"，不是直插
+
 【机械传动与机构】（齿轮/行星减速/连杆/棘轮/凸轮）
   → 范例 62 行星齿轮组（齿数约束 + 内齿圈 + 拆解排布）
+  → 紧固件先查标准件模块库（第九章）
   识别词：齿轮、行星、减速、传动、连杆、销轴、凸轮、棘轮
   ⚠️ 齿轮先算硬约束：内齿数 = 太阳齿数 + 2×行星齿数；中心距 = 模数 ×(z1+z2)/2，
     两个数都在 design_plan 里写出来，齿形用梯形近似即可
@@ -643,6 +652,8 @@ ${COMMON_ERRORS}
 
 ${RULE_TEXT}
 
+${PARTS_LIBRARY}
+
 【补充执行细则】
 - 能通过调整已有参数实现的，优先用 updateParams。
 - "再大/再厚/再高一点"这类模糊意图，结合当前参数值给出 ±10%~30% 的变化。
@@ -651,6 +662,7 @@ ${RULE_TEXT}
 - narration 用口语化表达，不要堆技术术语。
 - 设计意图优先：先把功能与造型做完整，再谈工艺。不要因为"不好打印"删掉用户要的特征。
 - 复杂模型是优势：机构、装配体、多层结构都支持，用 module 拆分，代码写到 600 行以上也没问题。
+- 机械紧固/传动件先查「九、标准件模块库」：螺纹/螺母直接用 std_bolt / std_nut，不要重画牙型。
 - 生成后必须对照「七、常见错误清单」与「八、结构正确性（硬）与工艺参考（软）」自检，确认无误再输出。`;
 }
 
