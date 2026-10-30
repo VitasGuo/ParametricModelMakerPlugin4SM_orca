@@ -78,6 +78,11 @@ export interface AiRequest {
   state: EditorState;
   /** 之前的对话历史（不含本轮）。user 用原始消息文本，assistant 用 narration。 */
   history: ChatMessage[];
+  /**
+   * 用户本轮上传的参考图（dataURL，已在前端压缩）。
+   * 支持视觉输入的模型会直接看到；纯文本模型会收到"看不到图片"的说明。
+   */
+  images?: string[];
   /** 调用方传入的模型配置覆盖项。 */
   modelOverride?: ModelConfig;
   /**

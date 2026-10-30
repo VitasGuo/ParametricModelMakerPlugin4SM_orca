@@ -3,11 +3,14 @@ import type { AiRequest } from '../src/core/types.js';
 import type { VerifyOutcome } from '../src/ai/verify.js';
 import type { WebModelConfig } from '../src/ai/providers.js';
 
-const mocks = vi.hoisted(() => ({ callProvider: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  callProvider: vi.fn(),
+  isMultimodal: vi.fn(() => false),
+}));
 
 vi.mock('../src/ai/providers.js', () => ({
   callProvider: mocks.callProvider,
-  isMultimodal: () => false,
+  isMultimodal: mocks.isMultimodal,
 }));
 
 import { chat } from '../src/ai/pipeline.js';
@@ -63,6 +66,8 @@ function raw(action: unknown, narration = 'ok'): string {
 
 beforeEach(() => {
   mocks.callProvider.mockReset();
+  mocks.isMultimodal.mockReset();
+  mocks.isMultimodal.mockReturnValue(false);
 });
 
 describe('chat 动作分派', () => {
@@ -128,5 +133,31 @@ describe('chat 动作分派', () => {
     const response = await chat(request(), CFG, async () => outcome());
     expect(response.verification?.status).toBe('failed');
     expect(response.rerollContext?.problems.join(' ')).toContain('这是盒子不是碗');
+  });
+});
+
+describe('用户附件图片', () => {
+  const IMG = 'data:image/jpeg;base64,AAAA';
+
+  it('纯文本模型：不发送图片，并在 user 文本里说明看不到', async () => {
+    mocks.callProvider.mockResolvedValueOnce({ text: raw({ type: 'explain', text: '好的' }) });
+    const req = request('按这张图做个模型');
+    req.images = [IMG];
+    await chat(req, CFG, async () => outcome());
+    const call = mocks.callProvider.mock.calls[0]!;
+    expect(call[3]).toEqual([]);
+    expect(call[2]).toContain('不支持图片输入');
+  });
+
+  it('视觉模型：用户附件与预览截图按顺序发送', async () => {
+    mocks.isMultimodal.mockReturnValue(true);
+    mocks.callProvider.mockResolvedValueOnce({ text: raw({ type: 'explain', text: '好的' }) });
+    const req = request('按这张图做个模型');
+    req.images = [IMG];
+    req.state.previewScreenshot = 'data:image/png;base64,BBBB';
+    await chat(req, CFG, async () => outcome());
+    const call = mocks.callProvider.mock.calls[0]!;
+    expect(call[3]).toEqual([IMG, 'data:image/png;base64,BBBB']);
+    expect(call[2]).toContain('1 张参考图');
   });
 });

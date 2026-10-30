@@ -20,6 +20,8 @@ export interface ChatEntry {
   id: string;
   role: ChatRole;
   text: string;
+  /** 用户附件缩略图（dataURL，小尺寸；完整图只在内存里用于重抽）。 */
+  images?: string[];
   /** 验证徽标（仅 AI 生成/修改时）。 */
   verification?: AiVerification;
   /** 验证失败/解析失败时，用于"重抽"。 */

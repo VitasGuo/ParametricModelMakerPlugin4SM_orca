@@ -7,7 +7,7 @@
 **仓库 / Repository**: https://github.com/VitasGuo/ParametricModelMakerPlugin4SM_orca<br>
 **开发者 / Developer**: VitasGuo · **许可证 / License**: [GPL-2.0-only](LICENSE)
 
-> **Beta 预览版 / Beta preview — v0.7.0-beta.1**
+> **Beta 预览版 / Beta preview — v0.7.0-beta.2**
 > 核心建模链路与 64 个范例已通过真实引擎 + 结构审计回归；插件安装脚本与各家 AI Provider 的兼容性仍在收集反馈，接口和范例可能继续调整。
 > The core modeling pipeline and all 64 examples pass real-engine and mesh-audit regression. The installer and provider compatibility are still collecting feedback; APIs and examples may change.
 
@@ -33,6 +33,7 @@ Every model is compiled for real by OpenSCAD WASM inside the browser (not by an 
 ## 功能 / Features
 
 - **自然语言建模 / Natural-language modeling**：用一句话描述想要的模型，AI 生成或修改 OpenSCAD 源码。<br>Describe the model you want in one sentence; the AI writes or edits the OpenSCAD source.
+- **对话参考图 / Reference images in chat**：输入框可添加最多 3 张参考图（按钮 / 粘贴 / 拖拽），浏览器内压缩后随消息发给视觉模型；纯文本模型会明确提示看不到图片。<br>Attach up to 3 reference images to a chat message (button / paste / drag-and-drop); they are compressed in the browser and sent to vision models, while text-only models get an explicit "cannot see images" note.
 - **真实引擎验证 / Real-engine verification**：每次生成都用 OpenSCAD WASM 编译；语法错误、空模型、尺寸异常会被打回重试。<br>Every generation is compiled with OpenSCAD WASM; syntax errors, empty models, and abnormal dimensions are rejected and retried.
 - **参数面板 / Parameter panel**：按 Customizer 注释自动生成滑杆、枚举、开关、颜色控件，参数通过 `-D` 覆盖，不改写源码。<br>Sliders, enums, checkboxes, and color controls are generated from Customizer annotations; parameters are applied via `-D` overrides without rewriting the source.
 - **3D 预览 / 3D preview**：Three.js Z-up 视图，等轴、正、顶、右视角、线框、截图。<br>Three.js Z-up viewer with iso / front / top / right views, wireframe, and screenshots.

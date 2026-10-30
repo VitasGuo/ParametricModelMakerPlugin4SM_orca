@@ -80,6 +80,11 @@ const en: Record<string, string> = {
   '未验证（跳过）': 'Not verified (skipped)',
   重抽: 'Retry',
   '按验证反馈重抽…': 'Retrying with verification feedback…',
+  图片: 'Image',
+  '最多 3 张参考图': 'Up to 3 reference images',
+  '请参考我上传的图片生成模型': 'Please generate a model from the images I uploaded',
+  '当前模型不支持图片输入，图片不会被读取；请换用 Claude / GPT-4o / GLM-4V 等视觉模型':
+    'This model cannot read images; switch to a vision model such as Claude / GPT-4o / GLM-4V.',
 
   // params
   '当前源码没有 Customizer 参数。': 'No Customizer parameters in the current source.',

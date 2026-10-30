@@ -9,7 +9,7 @@ import { injectParams } from '../core/scad-parser.js';
 import { chat } from '../ai/pipeline.js';
 import { verifyScad } from '../ai/verify.js';
 import { loadConfig, saveConfig } from '../ai/config.js';
-import { PROVIDERS, type WebModelConfig } from '../ai/providers.js';
+import { PROVIDERS, isMultimodal, type WebModelConfig } from '../ai/providers.js';
 import { compile } from '../engine/compiler.js';
 import {
   downloadArrayBuffer,
@@ -62,6 +62,7 @@ export class App {
   private lastOutput: ArrayBuffer | null = null;
   private wireframe = false;
   private codeWasOpen = false;
+  private readonly chatImages = new Map<string, string[]>();
 
   constructor(root: HTMLElement) {
     root.replaceChildren();
@@ -216,7 +217,7 @@ export class App {
     this.chatPanel = new ChatPanel({
       container: left,
       store: this.store,
-      onSend: (text) => this.handleSend(text),
+      onSend: (text, images, thumbs) => this.handleSend(text, images, thumbs),
       onReroll: (entry) => this.handleReroll(entry),
       onExamples: () => this.openExamples(),
       onSettings: () => this.openSettings(),
@@ -393,7 +394,7 @@ export class App {
     ]);
   }
 
-  private handleSend(text: string): boolean {
+  private handleSend(text: string, images: string[], thumbs: string[]): boolean {
     if (this.store.state.aiBusy) return false;
     if (!this.config?.apiKey) {
       toast('先配置模型和 API Key', 'error');
@@ -406,23 +407,40 @@ export class App {
       this.openSettings();
       return false;
     }
-    void this.runAi(text);
+    if (images.length > 0 && !isMultimodal(this.config)) {
+      toast('当前模型不支持图片输入，图片不会被读取；请换用 Claude / GPT-4o / GLM-4V 等视觉模型', 'error');
+    }
+    void this.runAi(text, undefined, images, thumbs);
     return true;
   }
 
-  private async runAi(userMessage: string, reroll?: RerollContext): Promise<void> {
+  private async runAi(
+    userMessage: string,
+    reroll?: RerollContext,
+    images: string[] = [],
+    thumbs: string[] = []
+  ): Promise<void> {
     if (!this.config) return;
     const started = performance.now();
     logger.info(
       'ai',
       reroll ? '按验证反馈重抽' : 'AI 生成请求',
-      `${this.config.provider}/${this.config.model} · ${userMessage.length} 字符`
+      `${this.config.provider}/${this.config.model} · ${userMessage.length} 字符 · ${images.length} 张图`
     );
     const history = this.store.aiHistory();
     if (reroll) {
       this.store.addChat({ role: 'system', text: '按验证反馈重抽…' });
     } else {
-      this.store.addChat({ role: 'user', text: userMessage });
+      this.store.addChat({ role: 'user', text: userMessage, images: thumbs });
+      if (images.length > 0) {
+        // 按原始用户消息缓存原图，供"重抽"复用；只留最近 10 条，避免大图常驻内存
+        this.chatImages.set(userMessage, images);
+        while (this.chatImages.size > 10) {
+          const oldest = this.chatImages.keys().next().value;
+          if (oldest === undefined) break;
+          this.chatImages.delete(oldest);
+        }
+      }
     }
     this.store.setAiBusy(true);
 
@@ -439,6 +457,7 @@ export class App {
               : '',
           capturedAt: Date.now(),
         },
+        images,
         history,
         rerollContext: reroll,
       };
@@ -535,7 +554,8 @@ export class App {
 
   private handleReroll(entry: ChatEntry): void {
     if (!entry.rerollContext) return;
-    void this.runAi(entry.rerollContext.userMessage, entry.rerollContext);
+    const images = this.chatImages.get(entry.rerollContext.userMessage) ?? [];
+    void this.runAi(entry.rerollContext.userMessage, entry.rerollContext, images);
   }
 
   private openSettings(): void {

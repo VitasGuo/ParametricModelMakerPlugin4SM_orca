@@ -453,6 +453,64 @@ button {
   font-size: 11px;
 }
 
+.chat-composer.dragging {
+  outline: 1px dashed rgba(74, 158, 255, 0.7);
+  outline-offset: -4px;
+}
+
+.chat-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chat-attach {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  border-radius: 7px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.chat-attach-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.chat-attach-x {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 17px;
+  height: 17px;
+  padding: 0;
+  line-height: 15px;
+  font-size: 13px;
+  border-radius: 4px;
+  border: none;
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  cursor: pointer;
+}
+
+.msg-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.msg-image {
+  max-width: 96px;
+  max-height: 96px;
+  border-radius: 6px;
+  border: 1px solid var(--border-soft);
+  object-fit: cover;
+}
+
 /* ---------------- params ---------------- */
 
 .params {

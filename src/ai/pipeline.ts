@@ -24,7 +24,10 @@ export async function chat(request: AiRequest, cfg: WebModelConfig, verify: Veri
   const system = SYSTEM_PROMPT;
   let userText = buildUserContext(request.userMessage, request.state);
   const screenshot = request.state.previewScreenshot;
-  const passImageToMain = !!screenshot && isMultimodal(cfg);
+  const userImages = request.images ?? [];
+  const canSeeImages = isMultimodal(cfg);
+  const passImageToMain = !!screenshot && canSeeImages;
+
   if (!passImageToMain) {
     userText = userText.replace(
       '【模型预览截图已随消息附上，请结合视觉判断】',
@@ -33,6 +36,17 @@ export async function chat(request: AiRequest, cfg: WebModelConfig, verify: Veri
         : '【当前没有可用的预览截图，请根据源码、参数与设计计划判断】'
     );
   }
+
+  if (userImages.length > 0) {
+    userText += canSeeImages
+      ? `\n\n【附件】用户本轮上传了 ${userImages.length} 张参考图（照片 / 草图 / 截图）。` +
+        '把其中的轮廓、比例、结构特征当作形状参考，不必逐像素复刻；' +
+        '图片只是视觉输入，不能当作可 import 的外部文件。'
+      : `\n\n【附件】用户本轮上传了 ${userImages.length} 张参考图，但当前模型不支持图片输入。` +
+        '不要假装看到了图片：按文字描述生成，并在 narration 里提醒用户换用支持视觉的模型' +
+        '（Claude / GPT-4o / GLM-4V / SenseNova 6.8 等），或改用「文件 → 从图片生成像素画」。';
+  }
+
   const isGenerative = request.state.scadSource.trim().length === 0;
   const temperature = isGenerative ? 0.7 : 0.3;
 
@@ -45,9 +59,12 @@ export async function chat(request: AiRequest, cfg: WebModelConfig, verify: Veri
     ];
   }
 
-  const raw = (
-    await callProvider(cfg, system, userText, passImageToMain ? screenshot : '', temperature, history)
-  ).text;
+  // 用户附件在前、当前模型预览在后，模型能区分"参考图"和"我生成的预览"
+  const imagesToSend = canSeeImages
+    ? [...userImages, ...(passImageToMain ? [screenshot] : [])]
+    : [];
+
+  const raw = (await callProvider(cfg, system, userText, imagesToSend, temperature, history)).text;
 
   return generateOnce(cfg, request.userMessage, raw, verify, request.state.paramValues);
 }
@@ -164,7 +181,7 @@ async function reviewDesign(
 
   try {
     const raw = (
-      await callProvider(cfg, sys, user, passImage ? outcome.screenshot : '', 0.1, [])
+      await callProvider(cfg, sys, user, passImage ? [outcome.screenshot] : [], 0.1, [])
     ).text;
     const match = /\{[\s\S]*\}/.exec(raw);
     const obj = match ? (JSON.parse(match[0]) as { verdict?: string; reason?: string }) : null;

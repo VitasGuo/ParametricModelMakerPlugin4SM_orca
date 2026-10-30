@@ -141,12 +141,12 @@ export class ProviderError extends Error {
   }
 }
 
-/** 调用主模型。 */
+/** 调用主模型。`images` 是 dataURL 列表（用户附件在前、预览截图在后）。 */
 export async function callProvider(
   cfg: WebModelConfig,
   system: string,
   userText: string,
-  screenshot: string,
+  images: string[],
   temperature: number,
   history: ChatMessage[]
 ): Promise<CallResult> {
@@ -156,9 +156,9 @@ export async function callProvider(
   }
 
   if (cfg.provider === 'claude') {
-    return callClaude(cfg, system, userText, screenshot, temperature, history);
+    return callClaude(cfg, system, userText, images, temperature, history);
   }
-  return callOpenAICompatible(cfg, system, userText, screenshot, temperature, history);
+  return callOpenAICompatible(cfg, system, userText, images, temperature, history);
 }
 
 interface ContentBlock {
@@ -176,7 +176,7 @@ async function callOpenAICompatible(
   cfg: WebModelConfig,
   system: string,
   userText: string,
-  screenshot: string,
+  images: string[],
   temperature: number,
   history: ChatMessage[]
 ): Promise<CallResult> {
@@ -186,10 +186,10 @@ async function callOpenAICompatible(
   const multimodal = meta.visionPattern.test(cfg.model);
 
   let userContent: OpenAIMessage['content'] = userText;
-  if (multimodal && screenshot) {
+  if (multimodal && images.length > 0) {
     userContent = [
       { type: 'text', text: userText },
-      { type: 'image_url', image_url: { url: screenshot } },
+      ...images.map((image): ContentBlock => ({ type: 'image_url', image_url: { url: image } })),
     ];
   }
 
@@ -241,7 +241,7 @@ async function callClaude(
   cfg: WebModelConfig,
   system: string,
   userText: string,
-  screenshot: string,
+  images: string[],
   temperature: number,
   history: ChatMessage[]
 ): Promise<CallResult> {
@@ -249,11 +249,11 @@ async function callClaude(
   const url = `${baseUrl}/v1/messages`;
 
   const userContent: ClaudeContent[] = [{ type: 'text', text: userText }];
-  if (screenshot) {
-    const base64 = screenshot.startsWith('data:') ? screenshot.split(',')[1] ?? '' : screenshot;
+  for (const image of images) {
+    const { media, data } = splitDataUrl(image);
     userContent.push({
       type: 'image',
-      source: { type: 'base64', media_type: 'image/png', data: base64 },
+      source: { type: 'base64', media_type: media, data },
     });
   }
 
@@ -359,6 +359,13 @@ function friendlyStatus(status: number): string {
 
 function trimSlash(url: string): string {
   return url.replace(/\/+$/, '');
+}
+
+/** 拆 dataURL：data:image/jpeg;base64,xxxx → { media, data }。非 dataURL 按 png 处理。 */
+function splitDataUrl(url: string): { media: string; data: string } {
+  const match = /^data:([^;,]+)[^,]*,(.*)$/s.exec(url);
+  if (match) return { media: match[1]!, data: match[2]! };
+  return { media: 'image/png', data: url };
 }
 
 /** 判断主模型是否原生支持图片输入。 */
