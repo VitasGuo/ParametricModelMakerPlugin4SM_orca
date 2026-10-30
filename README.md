@@ -137,7 +137,7 @@ npm run dev          # 独立网页开发 / standalone web dev server
 npm run build        # 生产构建 / production build
 npm run preview      # 预览构建产物 / preview the build output
 npm run typecheck    # tsc --noEmit
-npm test             # 单测 + 64 个范例真实引擎编译冒烟 / unit tests + real-engine smoke compile of all 64 examples
+npm test             # 单测 + 65 个范例真实引擎编译冒烟 / unit tests + real-engine smoke compile of all 65 examples
 ```
 
 不修改 Program Files 的插件验证方式 / Verifying the plugin without touching Program Files:
