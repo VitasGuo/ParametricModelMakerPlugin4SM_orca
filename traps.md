@@ -5,6 +5,26 @@
 
 ---
 
+## #45 另一台电脑安装提示「未找到 dist，自动构建前端」：dist 被 .gitignore 排除 ✅ 已修
+
+**现象**
+从 GitHub 下载/克隆到另一台电脑后运行 `install.bat`，控制台打印
+「[1/6] 未找到 dist，正在自动构建前端...」，需要 `npm install` + `npm run build`
+（数分钟且依赖 npm 网络）。用户期望的是下载即装、开箱即用。
+
+**根因**
+`.gitignore` 第 2 行 `dist/` 把构建产物排除在版本库外，所以仓库/下载包里从来没有 dist；
+`install.ps1#L64` 的兜底逻辑检测到缺 `dist/index.html` 就现场构建——行为正确，但
+违背"开箱即用"。dist 约 28MB（最大 `openscad.wasm` 10.6MB），此前为省仓库体积故意不入库。
+
+**解决方案**
+移除 `.gitignore` 的 `dist/`，提交预构建 `dist`（12 个文件），[install.ps1](orca-plugin/install.ps1#L64-L82)
+的自动构建保留为残缺兜底；README 安装说明同步改为「使用内置 dist，缺失时才构建」。
+⚠️ 代价：Vite 产物文件名带 hash，每次 `npm run build` 会删除旧文件、写入新文件，
+git 历史每次仍累积约 15–25MB 不可回收；后续若要控体积，可改走 GitHub Release 托管 dist zip。
+
+---
+
 ## #44 范例库精简 68→50：id 引用残留 + 删空分类后路由指向悬空 ✅ 已修
 
 **现象**

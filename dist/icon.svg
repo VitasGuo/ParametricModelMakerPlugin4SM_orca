@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="AI Parametric Model">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4379FC"/>
+      <stop offset="1" stop-color="#7FB0FF"/>
+    </linearGradient>
+    <linearGradient id="top" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.34"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.16"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="15" fill="url(#bg)"/>
+  <g stroke="#FFFFFF" stroke-width="2.1" stroke-linejoin="round" stroke-linecap="round">
+    <polygon points="32,15 49,24.5 32,34 15,24.5" fill="url(#top)"/>
+    <polygon points="15,24.5 32,34 32,53 15,43.5" fill="#FFFFFF" fill-opacity="0.1"/>
+    <polygon points="49,24.5 32,34 32,53 49,43.5" fill="#FFFFFF" fill-opacity="0.2"/>
+    <path d="M15 24.5v19L32 53l17-9.5v-19"/>
+  </g>
+  <path d="M48 10.5l1.6 3.9 3.9 1.6-3.9 1.6L48 21.5l-1.6-3.9L42.5 16l3.9-1.6z" fill="#FFFFFF" opacity="0.95"/>
+</svg>

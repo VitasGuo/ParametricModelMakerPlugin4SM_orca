@@ -72,12 +72,12 @@ Every model is compiled for real by OpenSCAD WASM inside the browser (not by an 
 
 1. 下载或克隆本仓库<br>Download or clone this repository
 2. 双击 **`orca-plugin\install.bat`**<br>Double-click **`orca-plugin\install.bat`**
-3. UAC 提权 → 自动查找 Orca 安装目录 → 自动构建前端（如缺 `dist`）→ 安装本地代理 → 注入插件 → 重启 Orca<br>UAC elevation → auto-detect the Orca install directory → build the frontend if `dist` is missing → install the local proxy → inject the plugin → restart Orca
+3. UAC 提权 → 自动查找 Orca 安装目录 → 使用内置 `dist`（缺失时自动构建）→ 安装本地代理 → 注入插件 → 重启 Orca<br>UAC elevation → auto-detect the Orca install directory → use the bundled `dist` (build only if missing) → install the local proxy → inject the plugin → restart Orca
 
 安装脚本会 / The installer will:
 
 - 通过运行中进程、卸载注册表、常见路径自动定位 Snapmaker Orca，找不到才要求手动输入<br>Locate Snapmaker Orca automatically via running processes, the uninstall registry, and common paths; ask for manual input only if not found
-- 缺少 `dist/` 时自动执行 `npm install` + `npm run build`<br>Run `npm install` + `npm run build` automatically when `dist/` is missing
+- 仓库已内置 `dist/`，下载即可开箱即用；仅当 `dist` 缺失时才回退执行 `npm install` + `npm run build`<br>The repo ships a prebuilt `dist/`, so a fresh download works out of the box; it only falls back to `npm install` + `npm run build` when `dist/` is missing
 - 备份 `resources\web\flutter_web\index.html` 为 `index.html.model-lab-backup`<br>Back up `resources\web\flutter_web\index.html` as `index.html.model-lab-backup`
 - 把静态资源复制到 `resources\web\flutter_web\model-lab\`（Orca 静态服务只映射已知顶层目录）<br>Copy static assets to `resources\web\flutter_web\model-lab\` (Orca's static server only maps known top-level directories)
 - 注入 `<script src="/web/flutter_web/model-lab/plugin.js"></script>`<br>Inject `<script src="/web/flutter_web/model-lab/plugin.js"></script>`
