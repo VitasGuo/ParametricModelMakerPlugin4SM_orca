@@ -55,8 +55,19 @@ describe('buildSystemPrompt', () => {
     expect(p).toContain('特征清单');
     // 创意泛化防错位（用户案例：体素哈利法塔 → 佛塔）
     expect(p).toContain('轮廓优先');
-    expect(p).toContain('不要把哈利法塔/铁塔做成中式楼阁塔');
+    expect(p).toContain('把哈利法塔/铁塔做成中式楼阁塔');
     expect(p).toContain('范例 69');
+  });
+
+  it('地标轮廓防锚定（beta.13 回归）：范例 69 只借方法，换地标必须重写轮廓函数结构', () => {
+    const p = buildSystemPrompt();
+    // 用户案例：体素广州塔 → 生成成哈利法塔（范例默认轮廓锚定）
+    expect(p).toContain('调参数调不出另一座塔');
+    expect(p).toContain('半径先减后增'); // 广州塔双曲面收腰的函数结构描述
+    expect(p).toContain('重写轮廓函数的结构');
+    expect(p).toContain('禁止照抄范例的默认轮廓'); // design_plan ④
+    expect(p).toContain('只借方法、不借参数'); // 范例库 header 例外
+    expect(p).toContain('不是来自范例的默认参数'); // workflow 轮廓优先
   });
 
   it('体积受控：范例分两级注入，整体不超过 80k 字符', () => {

@@ -98,6 +98,12 @@ describe('chat 动作分派', () => {
     expect(response.action?.type).toBe('replaceSource');
     expect(response.verification?.status).toBe('passed');
     expect(response.rerollContext).toBeUndefined();
+    // 审核员必须独立回忆地标轮廓，不能只信 design_plan（beta.13：广州塔→哈利法塔）
+    const reviewSys = String(mocks.callProvider.mock.calls[1]?.[1]);
+    const reviewUser = String(mocks.callProvider.mock.calls[1]?.[2]);
+    expect(reviewSys).toContain('凭你自己的知识独立写出它的标志性轮廓特征');
+    expect(reviewSys).toContain('广州塔');
+    expect(reviewUser).toContain('退台锥形');
   });
 
   it('编译失败 → 自动修复 2 轮仍失败 → failed + rerollContext 带问题清单', async () => {
