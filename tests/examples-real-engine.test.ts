@@ -3,8 +3,8 @@ import { EXAMPLES } from '../src/core/examples.js';
 import { compileScadInNode } from './helpers/compile-node.js';
 import { analyzeMesh } from './helpers/mesh-structure.js';
 
-/** 有意拆成多件打印的范例：盒身+盖子、花盆+托盘、4 个杯垫、燕尾榫两件套、齿轮拆解件、螺栓螺母套件。 */
-const MULTI_PART_OK = new Set([6, 9, 19, 40, 49, 62, 66]);
+/** 有意拆成多件打印的范例：盒身+盖子、花盆+托盘、燕尾榫两件套、齿轮拆解件、螺栓螺母套件。 */
+const MULTI_PART_OK = new Set([6, 9, 19, 49, 62, 66]);
 
 describe('范例库真实引擎冒烟（traps #1）', () => {
   it(`全部 ${EXAMPLES.length} 个范例编译成功且结构完整`, async () => {
@@ -28,11 +28,4 @@ describe('范例库真实引擎冒烟（traps #1）', () => {
       }
     }
   }, 180_000);
-
-  it('ex27 玫瑰线默认 5 瓣不再为空模型', async () => {
-    const ex = EXAMPLES.find((e) => e.id === 27)!;
-    const result = await compileScadInNode(ex.code);
-    expect(result.exit).toBe(0);
-    expect(result.stl?.length ?? 0).toBeGreaterThan(10_000);
-  });
 });

@@ -20,7 +20,7 @@ export const ENVIRONMENT = `
   模型静默塌成空壳或残缺形状，用户只会看到"生成失败"。
   禁止写 include / use。需要库的效果就用本知识库的等价写法：
   - 圆角方盒 → offset(r) + linear_extrude（范例 17），不要 rounded_box
-  - 齿轮 → 参数方程多边形（范例 28），不要 spur_gear
+  - 齿轮 → 第十章齿轮模块 spur_gear（范例 66），不要 include 的库函数
   - 阵列 → for 循环 + translate（范例 5），不要 grid_copies
   - 圆角立方体 → hull() 包两层缩放体（范例 10 思路），不要 minkowski + sphere
 
@@ -45,10 +45,8 @@ export const ENVIRONMENT = `
   import("xxx.svg") / import("xxx.stl") / surface() 都读不到文件，结果是空模型。
   需要形状就写 polygon() 或参数方程；需要文字就按 0.2 处理。
 
-【0.5 常用紧固件速查（M 规格，直接查表，不要让用户自己算）】
+【0.5 常用紧固件速查（M 规格，直接查表，不要让用户自己算；螺纹件走第九章）】
   规格   对边宽 S   螺距 p   通孔 d   沉头孔 D
-  M2     4.0       0.40     2.4      4.0
-  M2.5   5.0       0.45     2.9      4.7
   M3     5.5       0.50     3.4      6.0
   M4     7.0       0.70     4.5      8.0
   M5     8.0       0.80     5.5      9.4

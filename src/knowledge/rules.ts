@@ -235,10 +235,10 @@ export const RULES: readonly KnowledgeRule[] = [
   {
     id: 'P15',
     layer: 'print',
-    title: '螺纹：牙距 ≥ 2mm，径向间隙 0.2~0.4',
+    title: '自制螺纹：牙距 ≥ 2mm，径向间隙 0.2~0.4',
     check: '自检：螺旋参数与配合间隙',
     bad: '牙距 0.8 的瓶盖，FDM 打不出来也拧不上',
-    fix: '简化牙型、放大牙距，或改成卡扣结构',
+    fix: '简化牙型、放大牙距，或改成卡扣结构；标准公制螺纹走第九章 std_bolt / std_nut',
     autoDetect: false,
   },
   {

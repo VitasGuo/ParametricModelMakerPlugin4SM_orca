@@ -65,6 +65,9 @@ function raw(action: unknown, narration = 'ok'): string {
   return JSON.stringify({ action, narration });
 }
 
+/** 机械性失败的 3 连输出：首轮 + 2 轮修复全部失败。 */
+const BROKEN_ONCE = "cube([10,10,10);"; // 语法错误
+
 beforeEach(() => {
   mocks.callProvider.mockReset();
   mocks.isMultimodal.mockReset();
@@ -97,10 +100,12 @@ describe('chat 动作分派', () => {
     expect(response.rerollContext).toBeUndefined();
   });
 
-  it('编译失败 → failed + rerollContext 带问题清单', async () => {
-    mocks.callProvider.mockResolvedValueOnce({
-      text: raw({ type: 'replaceSource', scad: 'cube([10,10,10);', design_plan: '坏语法' }),
-    });
+  it('编译失败 → 自动修复 2 轮仍失败 → failed + rerollContext 带问题清单', async () => {
+    for (let i = 0; i < 3; i += 1) {
+      mocks.callProvider.mockResolvedValueOnce({
+        text: raw({ type: 'replaceSource', scad: BROKEN_ONCE, design_plan: '坏语法' }),
+      });
+    }
     const response = await chat(
       request(),
       CFG,
@@ -115,25 +120,79 @@ describe('chat 动作分派', () => {
     expect(response.verification?.status).toBe('failed');
     expect(response.rerollContext?.problems.join(' ')).toContain('syntax error');
     expect(response.action?.type).toBe('replaceSource');
+    expect(mocks.callProvider).toHaveBeenCalledTimes(3);
+    // 修复轮把实测问题回灌进对话历史
+    const repairCall = mocks.callProvider.mock.calls[1]!;
+    expect(JSON.stringify(repairCall[5])).toContain('真实引擎验证');
+    expect(JSON.stringify(repairCall[5])).toContain('syntax error');
   });
 
-  it('非法 JSON → error + rerollContext', async () => {
-    mocks.callProvider.mockResolvedValueOnce({ text: '这不是 JSON' });
+  it('编译失败 → 第 1 轮自动修复即通过 → passed', async () => {
+    mocks.callProvider
+      .mockResolvedValueOnce({
+        text: raw({ type: 'replaceSource', scad: BROKEN_ONCE, design_plan: '坏语法' }),
+      })
+      .mockResolvedValueOnce({
+        text: raw({ type: 'replaceSource', scad: GOOD_SCAD, design_plan: '立方体' }),
+      })
+      .mockResolvedValueOnce({ text: '{"verdict":"pass","reason":"形状符合"}' });
+
+    const verify = vi.fn(async (_s: string) => {
+      if (verify.mock.calls.length === 1) {
+        return outcome({ ok: false, problems: ['[编译] syntax error'], summaryText: '' });
+      }
+      return outcome();
+    });
+    const response = await chat(request(), CFG, verify);
+    expect(response.verification?.status).toBe('passed');
+    expect(response.rerollContext).toBeUndefined();
+    expect(verify).toHaveBeenCalledTimes(2);
+    expect(mocks.callProvider).toHaveBeenCalledTimes(3);
+  });
+
+  it('非法 JSON → 自动修复 2 轮仍失败 → error + rerollContext', async () => {
+    mocks.callProvider
+      .mockResolvedValueOnce({ text: '这不是 JSON' })
+      .mockResolvedValueOnce({ text: '还不是 JSON' })
+      .mockResolvedValueOnce({ text: '依旧不是 JSON' });
     const response = await chat(request(), CFG, async () => outcome());
     expect(response.action).toBeUndefined();
     expect(response.error).toContain('无法解析');
     expect(response.rerollContext?.problems[0]).toContain('合法 JSON');
+    expect(mocks.callProvider).toHaveBeenCalledTimes(3);
   });
 
-  it('几何审核 fail → verification failed', async () => {
+  it('几何审核连续失败 → 自动修复 2 轮仍不过 → failed（问题含审核理由）', async () => {
+    const good = raw({ type: 'replaceSource', scad: GOOD_SCAD, design_plan: '立方体' });
+    mocks.callProvider
+      .mockResolvedValueOnce({ text: good })
+      .mockResolvedValueOnce({ text: '{"verdict":"fail","reason":"这是盒子不是收纳盒"}' })
+      .mockResolvedValueOnce({ text: good }) // 修复轮答复（同源）
+      .mockResolvedValueOnce({ text: '{"verdict":"fail","reason":"还是盒子"}' })
+      .mockResolvedValueOnce({ text: good })
+      .mockResolvedValueOnce({ text: '{"verdict":"fail","reason":"仍然不是碗"}' });
+    const response = await chat(request('做一个多格收纳盒'), CFG, async () => outcome());
+    expect(response.verification?.status).toBe('failed');
+    expect(response.rerollContext?.problems.join(' ')).toContain('不是碗');
+    expect(mocks.callProvider).toHaveBeenCalledTimes(6);
+    // 修复轮把审核理由回灌给模型
+    expect(JSON.stringify(mocks.callProvider.mock.calls[2]?.[5])).toContain('这是盒子不是收纳盒');
+  });
+
+  it('几何审核 fail → 修复轮改正形状 → passed', async () => {
     mocks.callProvider
       .mockResolvedValueOnce({
         text: raw({ type: 'replaceSource', scad: GOOD_SCAD, design_plan: '立方体' }),
       })
-      .mockResolvedValueOnce({ text: '{"verdict":"fail","reason":"这是盒子不是碗"}' });
-    const response = await chat(request(), CFG, async () => outcome());
-    expect(response.verification?.status).toBe('failed');
-    expect(response.rerollContext?.problems.join(' ')).toContain('这是盒子不是碗');
+      .mockResolvedValueOnce({ text: '{"verdict":"fail","reason":"缺分格"}' })
+      .mockResolvedValueOnce({
+        text: raw({ type: 'replaceSource', scad: GOOD_SCAD, design_plan: '多格盒' }),
+      })
+      .mockResolvedValueOnce({ text: '{"verdict":"pass","reason":"分格已做"}' });
+    const response = await chat(request('做一个多格收纳盒'), CFG, async () => outcome());
+    expect(response.verification?.status).toBe('passed');
+    expect(response.rerollContext).toBeUndefined();
+    expect(mocks.callProvider).toHaveBeenCalledTimes(4);
   });
 
   it('part_spec 先清洗再交给验证器（非法条目被丢弃）', async () => {
@@ -186,5 +245,25 @@ describe('用户附件图片', () => {
     const call = mocks.callProvider.mock.calls[0]!;
     expect(call[3]).toEqual([IMG, 'data:image/png;base64,BBBB']);
     expect(call[2]).toContain('1 张参考图');
+  });
+
+  it('修复轮沿用本轮的用户文本与附件', async () => {
+    mocks.isMultimodal.mockReturnValue(true);
+    mocks.callProvider
+      .mockResolvedValueOnce({
+        text: raw({ type: 'replaceSource', scad: BROKEN_ONCE, design_plan: '坏语法' }),
+      })
+      .mockResolvedValueOnce({ text: raw({ type: 'explain', text: '解释' }) });
+    const req = request('按这张图做个支架');
+    req.images = [IMG];
+    await chat(
+      req,
+      CFG,
+      async () => outcome({ ok: false, problems: ['[编译] syntax error'], summaryText: '' })
+    );
+    const first = mocks.callProvider.mock.calls[0]!;
+    const repairCall = mocks.callProvider.mock.calls[1]!;
+    expect(repairCall[3]).toEqual(first[3]);
+    expect(repairCall[2]).toBe(first[2]);
   });
 });

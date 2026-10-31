@@ -186,7 +186,7 @@ difference() {
     name: '月牙形收纳盒',
     category: '2D 轮廓器物',
     level: 'basic',
-    applies: '收纳盒、托盘、非圆形容器、任何"2D 轮廓 + 高度"的物体',
+    applies: '收纳盒、托盘、非圆形容器、肾形/豆形容器、任何"2D 轮廓 + 高度"的物体',
     idea: '先在 XY 平面画 2D 轮廓（用 circle / square / polygon / difference），再用 linear_extrude 拉伸到 3D 高度',
     points: [
       '月牙 = 大圆 - 偏移的小圆（2D difference）',
@@ -195,6 +195,7 @@ difference() {
       '月牙角度由两圆偏移量控制，不是 rotate_extrude 的角度',
       '月牙是 2D 形状拉伸，【不是】rotate_extrude 旋转体',
       'length 通过 X 向缩放实现，默认外形 120×80',
+      '肾形/豆形 = 一个大圆减一个偏移到一侧的小圆（弧形凹陷）；【不是】两个相同圆 union（那是花生形）',
     ],
     code: `/* [主体尺寸] */
 length = 120; // [60:5:200]
@@ -247,68 +248,6 @@ scale([length / width, 1, 1])
 `,
   },
   {
-    id: 3.5,
-    name: '肾形收纳盒',
-    category: '2D 轮廓器物',
-    level: 'basic',
-    applies: '肾形、豆形、任何一侧有弧形凹陷的 2D 轮廓容器',
-    idea: '一个大圆减去一个偏移的圆，形成一侧的弧形凹陷',
-    points: [
-      '肾形【不是】两个相同大小的圆做 union（那是花生形）',
-      '肾形 = 一个大圆 - 一个偏移到一侧的小圆（弧形凹陷）',
-      '凹陷是弧形的，不是方形的（方形凹陷是马蹄形不是肾形）',
-    ],
-    code: `/* [主体尺寸] */
-length = 100; // [60:5:200]
-width = 70; // [40:5:150]
-height = 35; // [20:5:80]
-wall_thickness = 2; // [1:0.5:6]
-bottom_thickness = 3; // [1:0.5:8]
-
-/* [肾形凹陷] */
-indent_depth = 15; // [5:1:40]
-indent_radius = 25; // [10:1:50]
-
-/* [细节] */
-fillet_radius = 3; // [1:0.5:8]
-
-/* [Hidden] */
-$fn = 64;
-
-outer_r = width / 2;
-// 凹陷圆：半径比主圆小，中心偏移到一侧形成弧形凹陷
-indent_r = indent_radius;
-indent_offset_x = outer_r - indent_depth + indent_r * 0.3;
-
-module kidney_2d(r_out, r_in, off_x) {
-  difference() {
-    circle(r = r_out);
-    translate([off_x, 0]) circle(r = r_in);
-  }
-}
-
-// 外轮廓先圆角；内腔从同一轮廓整体内缩，凹陷处才不会把壁挖穿
-module outline() {
-  offset(r = fillet_radius) kidney_2d(outer_r, indent_r, indent_offset_x);
-}
-
-module box_outer() {
-  linear_extrude(height = height) outline();
-}
-
-module box_inner() {
-  translate([0, 0, bottom_thickness])
-    linear_extrude(height = height - bottom_thickness + 0.1)
-      offset(r = -wall_thickness) outline();
-}
-
-difference() {
-  box_outer();
-  box_inner();
-}
-`,
-  },
-  {
     id: 4,
     name: '方盒（直角厚壁）',
     category: '盒体收纳',
@@ -344,14 +283,16 @@ difference() {
   },
   {
     id: 5,
-    name: '多肉架（重复阵列）',
+    name: '网格分格收纳盒（多格盒子）',
     category: '盒体收纳',
     level: 'basic',
-    applies: '多格架、阵列孔、齿轮齿、栅栏、任何重复结构',
-    idea: 'for 循环生成多个子模块，用 translate/rotate 定位',
+    applies: '多格收纳盒、分格盒、多宫格盒子、药盒、冰格、工具格、多肉架',
+    idea: 'cell = (外廓−(n+1)×壁厚)/n 从外廓反推；外盒减每格腔体，一次 difference 留下隔板',
     points: [
-      '演算：cell_l = (length - (cols+1)*wall) / cols，行列同理',
-      '每格从底厚之上开始挖，+1 上溢保证挖穿',
+      '先演算再动手：cell_l = (length − (cols+1)×wall) / cols，cell_w 同理，数值写进 design_plan',
+      '隔板厚度 = wall（与外墙一致），格子是"挖"出来的，不需要手动摆隔板',
+      '每格腔体从底厚之上开挖，+1 上溢保证挖穿；格子数写进 design_plan 特征清单',
+      '用户说"多格/分格/几格"的盒子必须出格子，只有一个腔会被形状审核打回',
     ],
     code: `/* [主体尺寸] */
 length = 150; // [60:5:300]
@@ -362,6 +303,7 @@ height = 40; // [20:5:80]
 cols = 3; // [1:1:6]
 rows = 2; // [1:1:4]
 wall_thickness = 2; // [1:0.5:6]
+bottom_thickness = 2.5; // [1:0.5:8]
 
 /* [Hidden] */
 $fn = 32;
@@ -375,9 +317,9 @@ difference() {
     translate([
       wall_thickness + i * (cell_l + wall_thickness),
       wall_thickness + j * (cell_w + wall_thickness),
-      wall_thickness
+      bottom_thickness
     ])
-      cube([cell_l, cell_w, height - wall_thickness + 1]);
+      cube([cell_l, cell_w, height - bottom_thickness + 1]);
   }
 }
 `,
@@ -520,25 +462,24 @@ translate([0, 0, outer_r])
     idea: '同一套梯形牙螺旋：螺栓用原尺寸，螺母把同一螺旋径向和轴向各放大 clearance 后当刀具挖掉，因此牙型成对、一定能拧',
     points: [
       '牙型只写一次：thread_ridge 叠 48 段/圈形成右旋螺旋，螺栓和螺母共用',
-      '螺母内螺纹 = 同一螺旋放大 clearance（默认 0.3）后挖掉，径向/轴向间隙都留出来了',
-      '公制粗牙牙距：M3=0.5、M4=0.7、M5=0.8、M6=1.0、M8=1.25、M10=1.5、M12=1.75',
+      '螺母内螺纹 = 同一螺旋放大 clearance 后挖掉；间隙自动按 min(0.3, 0.24×牙距) 缩放（M8 恰好 0.3），全尺寸都能拧',
+      'pitch / 螺头 / 螺帽按 d 自动查表（M3~M12），传 std_bolt(d, length) 就够',
       '螺纹从螺栓头(z=head_h)起；螺母相位与螺栓对齐时按整牙距平移（不是随便放）',
-      '打印方向：六角头贴床、杆朝上；螺母平放；装配靠拧，不是直插',
-      '这是两件套：螺栓 + 螺母分列摆开，一起打印',
+      '两件套分列摆开；六角头贴床、杆朝上，螺母平放；装配靠拧，不是直插',
     ],
     code: `${PARTS_CODE}
 
 /* [螺栓] */
-bolt_d = 8; // [6:1:12]
+bolt_d = 8; // [3:1:12]
 bolt_length = 30; // [16:2:60]
-bolt_pitch = 1.25; // [1:0.25:2]
-head_d = 14; // [10:1:24]
-head_h = 5.3; // [3:0.5:10]
+bolt_pitch = 1.25; // [0.5:0.05:1.75]
+head_d = 14; // [5.5:0.5:19]
+head_h = 5.3; // [2:0.4:8]
 
 /* [螺母] */
-nut_thickness = 6.5; // [4:0.5:14]
-nut_outer = 14; // [10:1:24]
-clearance = 0.3; // [0.2:0.05:0.6]
+nut_thickness = 6.5; // [2.4:0.4:10]
+nut_outer = 14; // [5.5:0.5:19]
+clearance = 0.3; // [0.1:0.05:0.6]
 
 /* [排布] */
 part_gap = 12; // [6:2:30]
@@ -1055,7 +996,7 @@ translate([saucer_diameter / 2 + pot_top_r + 12, 0, 0])
     name: '手机支架',
     category: '园艺家居',
     level: 'classic',
-    applies: '手机支架、平板托架、展示架、阅读架',
+    applies: '手机支架、平板托架、展示架、阅读架、横放视频支架',
     idea: '托槽 = 外方块 − 内腔（留出手机厚度空间），前唇挡滑；背板绕 X 轴倾斜 tilt_angle 度（从竖直向后仰），手机靠在上面',
     points: [
       '背板倾角就是 rotate([-tilt_angle, 0, 0])：tilt=18 表示从竖直向后倒 18°，不是从水平算',
@@ -1063,6 +1004,7 @@ translate([saucer_diameter / 2 + pot_top_r + 12, 0, 0])
       '托槽内深 = phone_depth + 余量，手机底部连同保护壳一起塞得进去',
       '前唇 lip_height 只挡手机下沿，不要高到遮住屏幕',
       '演算：背板高度方向 = +Z 绕 X 轴旋转 -tilt 后的方向向量 [0, sin(tilt), cos(tilt)]',
+      '横放支架同一套路：底座更矮、前唇 + 背板卡住手机横放靠重力自稳（原范例 35 已并入）',
     ],
     code: `/* [支架] */
 phone_width = 75; // [60:5:110]
@@ -1101,147 +1043,11 @@ union() {
 `,
   },
   {
-    id: 21,
-    name: '分格笔筒',
-    category: '园艺家居',
-    level: 'classic',
-    applies: '笔筒、化妆刷筒、工具分格筒',
-    idea: '范例 16 的圆筒 + 过圆心的放射薄板隔断，rotate 绕 Z 均布',
-    points: [
-      'dividers = 2 → 十字；3 → 六分（每片隔 180/3 = 60°）',
-      '隔板长度 = 2 * 内半径，不能超出内壁',
-      '隔板从 bottom_thickness 起到口沿',
-    ],
-    code: `/* [笔筒] */
-cup_diameter = 90; // [50:5:160]
-cup_height = 100; // [50:5:200]
-wall_thickness = 2.5; // [1.5:0.5:6]
-bottom_thickness = 3; // [2:0.5:8]
-
-/* [分格] */
-dividers = 2; // [0:1:4]
-divider_thickness = 2; // [1:0.5:4]
-
-/* [Hidden] */
-$fn = 64;
-
-cup_r = cup_diameter / 2;
-inner_r = cup_r - wall_thickness;
-
-difference() {
-  cylinder(h = cup_height, r = cup_r);
-  translate([0, 0, bottom_thickness])
-    cylinder(h = cup_height, r = inner_r);
-}
-
-if (dividers > 0) {
-  for (i = [0 : dividers - 1]) {
-    rotate([0, 0, i * 180 / dividers])
-      translate([-inner_r, -divider_thickness / 2, bottom_thickness])
-        cube([inner_r * 2, divider_thickness, cup_height - bottom_thickness]);
-  }
-}
-`,
-  },
-  {
-    id: 22,
-    name: '沥水皂盒',
-    category: '园艺家居',
-    level: 'classic',
-    applies: '皂盒、沥水盘、筷子架、笔托',
-    idea: '四边围边的中空框 + 若干躺倒圆柱平行排列，水从条缝流走',
-    points: [
-      '沥水条 = rotate([0,90,0]) 的 cylinder（轴向沿 X），z 抬到 bar_diameter/2 让圆棒坐底（center=true 只管轴向居中）',
-      '演算：条间距 step = 内宽 / bar_count，第 i 条 y = 边厚 + step*(i+0.5)',
-      '条面低于框顶，边框挡住肥皂、条缝漏水',
-    ],
-    code: `/* [皂盒] */
-soap_length = 110; // [70:5:180]
-soap_width = 75; // [50:5:120]
-rim_height = 8; // [4:1:15]
-rim_thickness = 4; // [2:0.5:8]
-
-/* [沥水条] */
-bar_count = 5; // [3:1:9]
-bar_diameter = 7; // [4:0.5:10]
-
-/* [Hidden] */
-$fn = 32;
-
-step = (soap_width - rim_thickness * 2) / bar_count;
-
-// 中空边框
-difference() {
-  cube([soap_length, soap_width, rim_height]);
-  translate([rim_thickness, rim_thickness, -0.5])
-    cube([soap_length - 2*rim_thickness, soap_width - 2*rim_thickness, rim_height + 1]);
-}
-
-// 平行沥水条（圆柱躺倒，轴向 X，坐底不悬空）
-for (i = [0 : bar_count - 1]) {
-  translate([soap_length / 2, rim_thickness + step * (i + 0.5), bar_diameter / 2])
-    rotate([0, 90, 0])
-      cylinder(h = soap_length - rim_thickness * 2, r = bar_diameter / 2, center = true);
-}
-`,
-  },
-  {
-    id: 23,
-    name: '黄金螺旋盘（斐波那契）',
-    category: '数学曲线',
-    level: 'advanced',
-    applies: '黄金螺旋、斐波那契螺旋、对数螺旋盘、鹦鹉螺轮廓',
-    idea: '对数螺旋 r = r0·φ^(θ/90°)（每转过 90° 半径乘黄金比 φ=1.618，正是斐波那契数列相邻项之比的极限）。外缘点列 + 内缘点列反向拼成环带 polygon，linear_extrude 拉伸成盘',
-    points: [
-      '演算：spiral_r(θ) = r0 * pow(phi, θ/90)，θ 步长 5° 平滑',
-      '螺旋必须坐在一块圆底板上，否则只是一条悬空的带子；带子最高点留 2mm 边距',
-      '带状闭合 = 外缘（θ 从 0→总角）+ 内缘（θ 从 总角→0，半径减带宽）',
-      '带宽要小于起始半径：bw = min(band_width, r0 - 3)，否则中心段退化成一个自交尖角（实测会有 2 条开放边）',
-    ],
-    code: `/* [螺旋盘] */
-outer_diameter = 100; // [50:5:200]
-turns = 2; // [1:0.5:4]
-band_width = 6; // [2:0.5:15]
-thickness = 6; // [3:0.5:12]
-
-/* [底板] */
-base_thickness = 2; // [1:0.5:6]
-
-/* [Hidden] */
-$fn = 64;
-
-phi = (1 + sqrt(5)) / 2;
-r_end = outer_diameter / 2 - 2;
-r0 = r_end / pow(phi, turns * 360 / 90);
-
-function spiral_r(t) = r0 * pow(phi, t / 90);
-// 带宽不能吃掉起始半径，否则中心段会退化成一个自交的尖角
-bw = max(1, min(band_width, r0 - 3));
-function band_inner_r(t) = max(spiral_r(t) - bw, 0.4);
-total = turns * 360;
-
-outer_edge = [ for (t = [0 : 5 : total])
-  [spiral_r(t) * cos(t), spiral_r(t) * sin(t)] ];
-inner_edge = [ for (t = [total : -5 : 0])
-  [band_inner_r(t) * cos(t), band_inner_r(t) * sin(t)] ];
-
-union() {
-  // 圆底板
-  linear_extrude(height = base_thickness)
-    circle(r = outer_diameter / 2);
-  // 螺旋带（坐在底板上）
-  translate([0, 0, base_thickness - 0.5])
-    linear_extrude(height = thickness + 0.5)
-      polygon(concat(outer_edge, inner_edge));
-}
-`,
-  },
-  {
     id: 24,
     name: '阿基米德螺旋香薰盘',
     category: '数学曲线',
     level: 'advanced',
-    applies: '阿基米德螺旋、等距螺旋、香薰盘、迷宫盘',
+    applies: '阿基米德螺旋、等距螺旋、香薰盘、迷宫盘；换公式即黄金螺旋/心形线/玫瑰线',
     idea: '阿基米德螺旋 r = r0 + k·θ（圈距处处相等）。盘面挖一条等宽螺旋槽，盘心再挖茶蜡凹槽；槽必须按 6° 小段逐段挖，不能用一个自交的大多边形',
     points: [
       '演算：r(θ) = r0 + (盘半径 - r0 - 边距) × θ / 总角，槽宽固定 band_width',
@@ -1249,6 +1055,7 @@ union() {
       '螺旋槽逐 6° 一段用梯形多边形挖，相邻段共享边界，避免大 polygon 自交翻面',
       '槽起点半径要大于烛槽半径，两个凹槽之间至少留 3mm 料',
       '中心烛槽最后挖，深度浅于槽深，茶蜡放进去不会掉到底',
+      '同一 r(θ)→点列→polygon→extrude 手法换公式即成他型：黄金螺旋 r=r0×1.618^(θ/90°)；心形线 x=16sin³t、y=13cos t−5cos2t−2cos3t−cos4t；玫瑰线 r=|a·cos(kθ)|（k 奇=k 瓣、偶=2k 瓣，取绝对值防绕数抵消）',
     ],
     code: `/* [盘体] */
 plate_diameter = 110; // [60:5:220]
@@ -1339,510 +1146,6 @@ union() {
     translate([0, 0, -0.5]) cylinder(h = base_height + 1, d = base_diameter - 16);
   }
 }
-`,
-  },
-  {
-    id: 26,
-    name: '心形线首饰盘',
-    category: '数学曲线',
-    level: 'advanced',
-    applies: '心形线 cardioid、爱心首饰盘、心形托盘、礼盒',
-    idea: '经典心形参数方程 x=16sin³t、y=13cost−5cos2t−2cos3t−cos4t：顶部双瓣 + 中间 V 形凹口 + 底部尖点，天生正立。心形线 r=a(1+cosθ) 圆顶无凹口更像苹果，不用',
-    points: [
-      '演算：t=180° 时 y=−17 为底部尖点，t=0 时 y=5 为顶部凹口，x 半宽 16，按 heart_size/16 缩放',
-      '外盘 = 心形 polygon 拉伸；内腔 = offset(r=−wall_thickness) 同心内缩，底留 bottom_thickness',
-      '步长 5° 共 72 点足够平滑；凹口 V 形处内缩后自然变浅，不影响成型',
-    ],
-    code: `/* [首饰盘] */
-heart_size = 45; // [25:5:90]
-plate_height = 22; // [10:5:50]
-wall_thickness = 3; // [1.5:0.5:6]
-bottom_thickness = 3; // [1:0.5:8]
-
-/* [Hidden] */
-$fn = 64;
-
-// 经典心形参数方程（原始轮廓半宽 16）
-heart_scale = heart_size / 16;
-
-heart_pts = [ for (t = [0 : 5 : 359])
-  [
-    16 * pow(sin(t), 3) * heart_scale,
-    (13 * cos(t) - 5 * cos(2 * t) - 2 * cos(3 * t) - cos(4 * t)) * heart_scale
-  ] ];
-
-module heart_plate() {
-  polygon(heart_pts);
-}
-
-difference() {
-  linear_extrude(height = plate_height)
-    heart_plate();
-  translate([0, 0, bottom_thickness])
-    linear_extrude(height = plate_height)
-      offset(r = -wall_thickness) heart_plate();
-}
-`,
-  },
-  {
-    id: 27,
-    name: '玫瑰线杯垫',
-    category: '数学曲线',
-    level: 'advanced',
-    applies: '玫瑰线 rose curve、花瓣杯垫、花朵托盘、装饰盘',
-    idea: '玫瑰线 r = |a·cos(kθ)|。k 为奇数时 k 片花瓣，k 为偶数时 2k 片；取绝对值避免奇数 k 负半径导致 polygon 绕数抵消',
-    points: [
-      'k 为奇数（3/5/7）→ k 瓣；k 为偶数（4/8）→ 2k 瓣',
-      'θ 扫 0→360 全周期；步长 4° 足够平滑',
-      '必须对 r 取 abs：奇数 k 的负半径会把点翻到对侧，让 polygon 自重叠成空模型',
-      '中心 difference 圆孔穿挂绳，或留实心直接当杯垫',
-    ],
-    code: `/* [花朵盘] */
-flower_size = 48; // [25:5:100]
-petals = 5; // [3:1:9]
-plate_height = 6; // [3:0.5:15]
-
-/* [细节] */
-hole_diameter = 6; // [0:1:20]
-
-/* [Hidden] */
-$fn = 64;
-
-function rose_r(a, k, t) = abs(a * cos(k * t));
-
-rose_pts = [ for (t = [0 : 4 : 359])
-  [rose_r(flower_size, petals, t) * cos(t), rose_r(flower_size, petals, t) * sin(t)] ];
-
-difference() {
-  linear_extrude(height = plate_height)
-    polygon(rose_pts);
-  if (hole_diameter > 0)
-    translate([0, 0, -0.5])
-      cylinder(h = plate_height + 1, d = hole_diameter);
-}
-`,
-  },
-  {
-    id: 28,
-    name: '渐开线齿轮（梯形齿近似）',
-    category: '数学曲线',
-    level: 'advanced',
-    applies: '齿轮、棘轮、传动件、机械摆件',
-    idea: '渐开线齿廓用梯形齿近似：每齿 4 个点在齿根圆与齿顶圆之间交替，for 嵌套生成全周点列。中心轴孔 + 环排减重孔',
-    points: [
-      '演算：每齿角 ta = 360/teeth；点角度 = i*ta + [0, 0.25, 0.5, 0.75]*ta',
-      '第 1、4 点在齿根圆 root_r，第 2、3 点在齿顶圆 tip_r，连成梯形齿',
-      '齿顶厚 ≈ 齿距的一半，太薄打印易断',
-    ],
-    code: `/* [齿轮] */
-teeth = 12; // [6:1:30]
-pitch_diameter = 60; // [24:2:200]
-tooth_height = 4; // [2:0.5:10]
-gear_thickness = 8; // [3:0.5:20]
-
-/* [轴孔] */
-bore_diameter = 8; // [4:0.5:30]
-
-/* [减重孔] */
-vent_count = 5; // [0:1:10]
-vent_diameter = 10; // [4:1:24]
-
-/* [Hidden] */
-$fn = 64;
-
-root_r = pitch_diameter / 2 - tooth_height;
-tip_r = pitch_diameter / 2 + tooth_height;
-
-function tooth_pts(i) =
-  let (ta = 360 / teeth)
-  [
-    [root_r * cos(i * ta),                root_r * sin(i * ta)],
-    [tip_r  * cos(i * ta + 0.25 * ta),    tip_r  * sin(i * ta + 0.25 * ta)],
-    [tip_r  * cos(i * ta + 0.5 * ta),     tip_r  * sin(i * ta + 0.5 * ta)],
-    [root_r * cos(i * ta + 0.75 * ta),    root_r * sin(i * ta + 0.75 * ta)]
-  ];
-
-gear_pts = [ for (i = [0 : teeth - 1]) for (p = tooth_pts(i)) p ];
-vent_ring = pitch_diameter / 2 - tooth_height * 2 - vent_diameter / 2 - 2;
-
-difference() {
-  linear_extrude(height = gear_thickness)
-    polygon(gear_pts);
-  // 轴孔
-  translate([0, 0, -0.5])
-    cylinder(h = gear_thickness + 1, d = bore_diameter);
-  // 环排减重孔
-  if (vent_count > 0 && vent_ring > vent_diameter / 2 + bore_diameter / 2) {
-    for (i = [0 : vent_count - 1]) {
-      angle = i * 360 / vent_count;
-      translate([vent_ring * cos(angle), vent_ring * sin(angle), -0.5])
-        cylinder(h = gear_thickness + 1, d = vent_diameter);
-    }
-  }
-}
-`,
-  },
-  {
-    id: 29,
-    name: '六角凉亭',
-    category: '建筑营造',
-    level: 'advanced',
-    applies: '凉亭、六角亭、中式景观小品、庭院摆件',
-    idea: '亭 = 台基（$fn=6 双层圆台）+ 6 柱环排 + 攒尖顶（收缩 $fn=6 圆台叠层）+ 出檐（大薄六角板）+ 宝顶。全部用 $fn=6 圆柱/圆台拼装，rotate 30° 错缝出檐',
-    points: [
-      '柱高 ≈ 台基宽的 0.7~1.0 倍，攒尖顶高 ≈ 柱高的 0.6 倍，比例才像亭',
-      '檐板直径 = 柱环直径 × 1.4，rotate 30° 与顶盖错缝更像双层檐',
-      '宝顶 = 小圆柱 + 压扁 sphere，压扁用 scale([1,1,1.4]) 拉长',
-    ],
-    code: `/* [台基] */
-base_width = 90; // [50:5:200]
-base_height = 8; // [4:1:16]
-
-/* [亭身] */
-column_count = 6; // [4:1:12]
-column_height = 65; // [30:5:140]
-column_diameter = 6; // [3:0.5:12]
-ring_diameter = 60; // [30:5:150]
-
-/* [攒尖顶] */
-roof_height = 40; // [20:5:90]
-eave_diameter = 90; // [40:5:220]
-
-/* [宝顶] */
-finial_height = 18; // [8:1:40]
-
-/* [Hidden] */
-$fn = 6;
-
-ring_r = ring_diameter / 2;
-
-// 台基：两层收缩圆台
-cylinder(h = base_height / 2, d = base_width + 14);
-translate([0, 0, base_height / 2])
-  cylinder(h = base_height / 2, d1 = base_width + 14, d2 = base_width);
-
-// 6 柱环排
-for (i = [0 : column_count - 1]) {
-  angle = i * 360 / column_count;
-  translate([ring_r * cos(angle), ring_r * sin(angle), base_height])
-    cylinder(h = column_height, d = column_diameter, $fn = 24);
-}
-
-// 出檐：大薄六角板，rotate 30° 错缝
-translate([0, 0, base_height + column_height])
-  rotate([0, 0, 30])
-    cylinder(h = 3, d = eave_diameter);
-
-// 攒尖顶：收缩六角圆台
-translate([0, 0, base_height + column_height + 3])
-  cylinder(h = roof_height, d1 = eave_diameter * 0.8, d2 = 6);
-
-// 宝顶：小柱 + 拉长球
-translate([0, 0, base_height + column_height + 3 + roof_height])
-  cylinder(h = finial_height * 0.4, d = 5, $fn = 24);
-translate([0, 0, base_height + column_height + 3 + roof_height + finial_height * 0.4])
-  scale([1, 1, 1.4])
-    sphere(d = 8, $fn = 24);
-`,
-  },
-  {
-    id: 30,
-    name: '楼阁式塔',
-    category: '建筑营造',
-    level: 'advanced',
-    applies: '宝塔、楼阁、多层塔、雷峰塔式摆件',
-    idea: 'for 层堆叠：每层 = 方形层身 + 出檐（比层身大的薄方板）。层身逐层收缩，层高逐层降低，顶层收尖',
-    points: [
-      '演算：第 i 层身宽 w = base_w * (1 - i * taper)，taper 取 4%~6%',
-      '层高逐层降 5%，所以下一层起点必须按累计高度算，否则层与层之间会悬空',
-      '每层身四面开圆窗（环排 difference），层底落在下一层檐板上',
-    ],
-    code: `/* [塔身] */
-base_width = 60; // [30:5:120]
-levels = 5; // [3:1:9]
-level_height = 30; // [15:5:60]
-wall_thickness = 3; // [1.5:0.5:8]
-
-/* [檐顶] */
-eave_over = 6; // [2:0.5:15]
-eave_thickness = 4; // [2:0.5:8]
-taper = 0.05; // [0.02:0.01:0.1]
-
-/* [Hidden] */
-$fn = 32;
-
-module level_body(w, h) {
-  difference() {
-    translate([-w / 2, -w / 2, 0]) cube([w, w, h]);
-    // 四面圆窗
-    for (a = [0 : 90 : 270]) {
-      rotate([0, 0, a])
-        translate([0, w / 2 + 0.5, h * 0.6])
-          rotate([90, 0, 0])
-            cylinder(h = wall_thickness + 1, r = w * 0.08, $fn = 24);
-    }
-  }
-}
-
-module eave(w, t) {
-  translate([-w / 2, -w / 2, 0]) cube([w, w, t]);
-}
-
-// 每层收缩 5%，层身逐层变矮：层起点必须累计，不能简单用 i*(level_height + eave)
-shrink = 0.05;
-function level_h(i) = level_height * (1 - i * shrink);
-function level_z(i) = i * eave_thickness + level_height * (i - shrink * i * (i - 1) / 2);
-last_level = levels - 1;
-top_z = level_z(last_level) + level_h(last_level) + eave_thickness;
-top_w = base_width * (1 - last_level * taper);
-
-union() {
-  for (i = [0 : last_level]) {
-    w = base_width * (1 - i * taper);
-    h = level_h(i);
-    z = level_z(i);
-    translate([0, 0, z]) level_body(w, h);
-    translate([0, 0, z + h]) eave(w + eave_over * 2, eave_thickness);
-  }
-  // 顶层收尖（坐在最后一层檐板上）
-  translate([0, 0, top_z])
-    cylinder(h = level_height * 0.9, d1 = top_w, d2 = 4, $fn = 4);
-}
-`,
-  },
-  {
-    id: 31,
-    name: '立体主义头像（毕加索风格）',
-    category: '艺术风格',
-    level: 'advanced',
-    applies: '立体主义、抽象头像、毕加索风雕塑、多视角构成',
-    idea: '立体主义 = 多视角同框：侧脸剪影板与正面脸板呈 90° 交叉，五官拆成独立几何块（棱锥鼻、圆孔眼、圆弧眉）错位摆放，不对称即风格',
-    points: [
-      '侧脸剪影 = 手绘 polygon（额头→鼻梁→鼻尖→人中→下巴→颈），linear_extrude 薄板',
-      '正面板 = 圆角方板 difference 两个圆孔眼；两板呈 90° 相交，插接处实体重叠',
-      '五官块故意错位/不对称：一只眼睛是孔，一只是凸球，鼻子是 $fn=4 棱锥',
-    ],
-    code: `/* [整体] */
-head_width = 60; // [30:5:120]
-head_height = 80; // [40:5:160]
-plate_thickness = 6; // [3:0.5:12]
-
-/* [五官] */
-eye_diameter = 14; // [6:1:30]
-nose_size = 16; // [8:1:40]
-
-/* [Hidden] */
-$fn = 32;
-
-// 侧脸剪影（朝 +x 的侧脸：额→鼻→唇→下巴）
-side_profile = [
-  [0, 0],
-  [0, head_height * 0.92],
-  [head_width * 0.18, head_height],        // 额头顶
-  [head_width * 0.30, head_height * 0.78], // 鼻梁
-  [head_width * 0.38, head_height * 0.66], // 鼻尖
-  [head_width * 0.26, head_height * 0.58], // 人中
-  [head_width * 0.34, head_height * 0.50], // 唇
-  [head_width * 0.24, head_height * 0.42], // 下巴窝
-  [head_width * 0.30, head_height * 0.28], // 下巴
-  [head_width * 0.10, 0]
-];
-
-// 底座：放在 z=0 且与两块头板在底部重叠，整件连成一体
-cylinder(h = 6, d1 = head_width * 0.9, d2 = head_width * 0.8, $fn = 48);
-
-union() {
-  // 侧脸板（YZ 平面立起，面朝 +x）
-  rotate([90, 0, 90])
-    linear_extrude(height = plate_thickness)
-      polygon(side_profile);
-
-  // 正面板（XY 平面立起，面朝 +z 的观察者），带两只"孔眼"
-  // z 向上抬 0.4*head_height + 0.12*head_width，让板底落在 z=0 而不是一半埋到床下
-  translate([-plate_thickness / 2, 0, head_height * 0.4 + head_width * 0.12])
-    rotate([90, 0, 0])
-      translate([0, 0, -plate_thickness / 2])
-        linear_extrude(height = plate_thickness, center = true)
-          difference() {
-            offset(r = head_width * 0.12)
-              square([head_width * 0.55, head_height * 0.8], center = true);
-            translate([-head_width * 0.12, head_height * 0.18])
-              circle(d = eye_diameter);
-            translate([head_width * 0.14, head_height * 0.20])
-              circle(d = eye_diameter * 0.7);
-          }
-
-  // 棱锥鼻（$fn=4 锥体，立体主义的"分析期"几何）
-  translate([plate_thickness / 2 + nose_size * 0.3, 0, head_height * 0.55])
-    rotate([0, -90, 0])
-      cylinder(h = nose_size, d1 = nose_size, d2 = 0, $fn = 4);
-
-  // 凸球眼（贴在侧脸板上，与孔眼形成不对称）
-  translate([plate_thickness, head_height * 0.08, head_height * 0.72])
-    sphere(d = eye_diameter * 0.8, $fn = 24);
-}
-`,
-  },
-  {
-    id: 32,
-    name: '构成主义动态雕塑（考尔德风）',
-    category: '艺术风格',
-    level: 'advanced',
-    applies: '动态雕塑、构成主义、考尔德风、平衡装置摆件',
-    idea: '底座竖杆 + 顶端横杆，两端一上一下挂不同大小的圆盘，重心故意不对称——"不稳定中的平衡"就是风格本体。全部 union 成一体，吊杆与盘面重叠 2mm',
-    points: [
-      '主杆沉入底座 2mm、横杆穿过主杆，所有零件都在同一个 union 里',
-      '横杆沿 X 轴，整体绕竖杆偏转 arm_yaw；两端盘径一大一小（重量错觉）',
-      '挂盘 = 薄 cylinder，吊杆底端埋进盘面 2mm，保证一体打印不断裂',
-    ],
-    code: `/* [底座] */
-base_diameter = 60; // [30:5:120]
-base_height = 8; // [4:1:16]
-
-/* [主杆] */
-mast_height = 110; // [50:5:220]
-rod_diameter = 5; // [2:0.5:10]
-
-/* [横杆与挂盘] */
-arm_length = 80; // [40:5:160]
-big_disc = 34; // [15:2:70]
-small_disc = 20; // [10:2:50]
-arm_yaw = 12; // [0:1:35]
-
-/* [Hidden] */
-$fn = 48;
-
-top_z = base_height + mast_height;
-arm_z = top_z - 4;
-arm_in_x = -arm_length * 0.35;
-arm_out_x = arm_length * 0.65;
-disc_rod = rod_diameter * 0.6;
-
-union() {
-  // 底座
-  cylinder(h = base_height, d1 = base_diameter, d2 = base_diameter * 0.85);
-  // 主杆（沉入底座 2mm）
-  translate([0, 0, base_height - 2])
-    cylinder(h = mast_height + 2, d = rod_diameter);
-
-  // 横杆与挂盘：整体绕竖杆偏转 arm_yaw
-  rotate([0, 0, arm_yaw]) {
-    // 横杆（沿 X 轴，穿过主杆）
-    translate([arm_in_x, 0, arm_z])
-      rotate([0, 90, 0])
-        cylinder(h = arm_length, d = rod_diameter * 0.8);
-
-    // 大盘：吊杆从横杆垂下，底端埋进盘面 2mm
-    translate([arm_in_x, 0, arm_z - 12])
-      cylinder(h = 12, d = disc_rod);
-    translate([arm_in_x, 0, arm_z - 13])
-      rotate([18, 0, 0])
-        cylinder(h = 3, d = big_disc);
-
-    // 小盘：吊杆从横杆向上，顶端埋进盘面 2mm
-    translate([arm_out_x, 0, arm_z])
-      cylinder(h = 10, d = disc_rod);
-    translate([arm_out_x, 0, arm_z + 8])
-      rotate([-25, 0, 0])
-        cylinder(h = 3, d = small_disc);
-  }
-}
-`,
-  },
-  {
-    id: 33,
-    name: '新造型主义浮雕板（蒙德里安风）',
-    category: '艺术风格',
-    level: 'classic',
-    applies: '蒙德里安式构成、几何浮雕、墙面装饰画、新造型主义',
-    idea: '经典红黄蓝构成 → 三种深度的凸块。格子布局用黄金比例递归分割：整块先按 0.618 分两块，再各自细分，最后一次 for 把布局数组里的矩形凸到不同高度',
-    points: [
-      '布局数组 cells = [[x, y, w, h, depth], ...]，depth 取 2/4/6 三级对应"色块权重"',
-      '分割用黄金比 0.618：横竖交替分割比经典均分更有蒙德里安味',
-      '底板边框留 4mm 平边，凸块互不重叠（布局数组已保证）',
-    ],
-    code: `/* [画板] */
-board_length = 140; // [60:5:300]
-board_width = 100; // [40:5:250]
-board_thickness = 5; // [3:0.5:12]
-
-/* [浮雕] */
-depth_low = 2;   // [1:0.5:6]
-depth_mid = 4;   // [2:0.5:10]
-depth_high = 6;  // [3:0.5:14]
-frame = 4; // [2:0.5:10]
-
-/* [Hidden] */
-$fn = 32;
-
-g = 0.618;  // 黄金分割比
-L = board_length - frame * 2;
-W = board_width - frame * 2;
-
-// 黄金比例网格布局：x 方向按 0.618 递归两刀，y 方向一刀
-// 每格 [x, y, w, h, depth]（depth：1=低 2=中 3=高，映射到三级深度）
-cells = [
-  [0, 0, L * g * g, W, 3],
-  [L * g * g, 0, L * g, W * g, 1],
-  [L * g * g, W * g, L * g * 0.5, W * (1 - g), 2],
-  [L * g * g + L * g * 0.5, W * g, L * g * 0.5, W * (1 - g), 1],
-  [L * (g + g * g), 0, L * (1 - g - g * g), W, 2]
-];
-
-module relief() {
-  cube([board_length, board_width, board_thickness]);
-  for (c = cells) {
-    depth = c[4] == 3 ? depth_high : (c[4] == 2 ? depth_mid : depth_low);
-    translate([frame + c[0], frame + c[1], board_thickness - 0.5])
-      cube([c[2], c[3], depth + 0.5]);
-  }
-}
-
-relief();
-`,
-  },
-  {
-    id: 35,
-    name: '手机横放支架',
-    category: '实用工具',
-    level: 'classic',
-    applies: '横屏看视频、视频通话、平板托架',
-    idea: '低矮底座 + 后仰背板 + 前唇三件套：手机横放，下沿卡在前唇与背板之间，靠重力自稳',
-    points: [
-      '前唇与背板都下沉 1mm 与底座相交，不是只贴面',
-      '背板用 rotate([-tilt_angle,0,0]) 让顶端向 +Y 后仰，整块重心仍在底座范围内',
-      '演算：背板底边 y = base_depth*0.5，顶端后移 back_height*sin(tilt) 不超出底座',
-    ],
-    code: `/* [底座] */
-stand_width = 150; // [100:5:220]
-base_depth = 80; // [60:5:140]
-base_thickness = 6; // [4:1:12]
-
-/* [背板] */
-back_height = 100; // [60:5:160]
-tilt_angle = 20; // [5:1:40]
-board_thickness = 4; // [2:0.5:8]
-
-/* [前唇] */
-lip_height = 12; // [6:1:30]
-lip_thickness = 5; // [3:0.5:10]
-
-/* [Hidden] */
-$fn = 48;
-
-back_y = base_depth * 0.5;
-
-// 底座
-cube([stand_width, base_depth, base_thickness]);
-
-// 背板：底部沉入底座 1mm，顶端后仰
-translate([0, back_y, base_thickness - 1])
-  rotate([-tilt_angle, 0, 0])
-    cube([stand_width, board_thickness, back_height]);
-
-// 前唇：挡手机下沿
-translate([0, 0, base_thickness - 1])
-  cube([stand_width, lip_thickness, lip_height + 1]);
 `,
   },
   {
@@ -1943,48 +1246,6 @@ difference() {
 `,
   },
   {
-    id: 38,
-    name: '内六角扳手架',
-    category: '实用工具',
-    level: 'basic',
-    applies: '内六角扳手收纳、螺丝刀/钻头立放、小工具排插',
-    idea: '条状底座上按序号等距开一排六边形盲孔，孔径逐级递增，一套扳手从大到小各就各位',
-    points: [
-      '六角孔 = cylinder($fn=6)，孔径沿序号等差递增',
-      '孔径上限同时受条宽与孔间距约束（max_hole），极端参数不会打穿侧壁或并孔',
-      '孔是盲孔：从顶面向下挖 pocket_depth，底面留料',
-    ],
-    code: `/* [底座] */
-base_length = 90; // [50:5:160]
-base_width = 24; // [14:1:40]
-base_height = 12; // [8:1:28]
-
-/* [六角孔] */
-wrench_count = 6; // [3:1:9]
-min_size = 2.5; // [1.5:0.5:5]
-size_step = 1.2; // [0.2:0.2:2.5]
-hole_clearance = 0.4; // [0.1:0.1:1]
-hole_depth_ratio = 0.6; // [0.3:0.05:0.9]
-
-/* [Hidden] */
-$fn = 64;
-
-spacing = base_length / (wrench_count + 1);
-pocket_depth = base_height * hole_depth_ratio;
-max_hole = min(base_width - 4, spacing * 0.8);
-
-difference() {
-  translate([-base_length / 2, -base_width / 2, 0])
-    cube([base_length, base_width, base_height]);
-  for (i = [0 : wrench_count - 1]) {
-    d = min(min_size + i * size_step, max_hole) + hole_clearance;
-    translate([-base_length / 2 + spacing * (i + 1), 0, base_height - pocket_depth])
-      cylinder(h = pocket_depth + 1, d = d, $fn = 6);
-  }
-}
-`,
-  },
-  {
     id: 39,
     name: 'SD 卡收纳盒',
     category: '实用工具',
@@ -2026,92 +1287,6 @@ difference() {
       cube([card_length, box_w - back_thickness + 1, gap]);
   }
 }
-`,
-  },
-  {
-    id: 40,
-    name: '杯垫套装',
-    category: '家居生活',
-    level: 'basic',
-    applies: '杯垫、锅垫、鼠标垫片，一套多件一起打印',
-    idea: '六边形轮廓（cylinder + $fn=6）顶面挖一层浅凹槽挡水，count 个按两列自动排布成一套',
-    points: [
-      '所有圆统一用 $fn=6，杯垫和凹槽都是同向六边形，边距均匀',
-      '凹槽深 recess_depth、外沿留 rim_width，洒出的水不会流到桌面',
-      '2 列排布，count 1~6 时不会超出热床（默认 4 件约 190mm 宽）',
-    ],
-    code: `/* [杯垫] */
-coaster_size = 90; // [60:5:120]
-coaster_thickness = 6; // [4:0.5:12]
-rim_width = 6; // [3:1:12]
-recess_depth = 1.5; // [0.5:0.2:3]
-
-/* [套装布局] */
-count = 4; // [1:1:6]
-gap = 6; // [2:1:20]
-
-/* [Hidden] */
-$fn = 6;
-
-module coaster() {
-  difference() {
-    cylinder(h = coaster_thickness, d = coaster_size);
-    translate([0, 0, coaster_thickness - recess_depth])
-      cylinder(h = recess_depth + 1, d = coaster_size - 2 * rim_width);
-  }
-}
-
-for (i = [0 : count - 1]) {
-  col = i % 2;
-  row = floor(i / 2);
-  translate([col * (coaster_size + gap), row * (coaster_size + gap), 0])
-    coaster();
-}
-`,
-  },
-  {
-    id: 41,
-    name: '书立',
-    category: '家居生活',
-    level: 'classic',
-    applies: '书立、挡书板、唱片/文件分隔立板',
-    idea: 'L 形主体：横向底板压在书下，端头一块竖背板，背面再加两片三角形加强筋，单体打印无需支撑',
-    points: [
-      '背板与底板在 x∈[-plate_thickness,0] 内重叠，不是贴面拼接',
-      '加强筋在 X-Z 平面画三角形，再 rotate([90,0,0]) 沿 Y 拉伸',
-      '加强筋从背板背面一直压到底板，受力方向正好是书本推力',
-    ],
-    code: `/* [底板] */
-base_length = 75; // [50:5:140]
-base_width = 90; // [50:5:160]
-base_thickness = 5; // [3:1:12]
-
-/* [背板] */
-plate_height = 120; // [60:5:200]
-plate_thickness = 5; // [3:1:10]
-
-/* [加强筋] */
-rib_length = 45; // [20:5:80]
-rib_height = 70; // [30:5:150]
-rib_thickness = 4; // [2:1:8]
-
-/* [Hidden] */
-$fn = 32;
-
-// 底板（x 从 -plate_thickness 起，与背板重叠）
-translate([-plate_thickness, 0, 0])
-  cube([base_length + plate_thickness, base_width, base_thickness]);
-
-// 背板
-translate([-plate_thickness, 0, 0])
-  cube([plate_thickness, base_width, plate_height]);
-
-// 三角形加强筋：X-Z 平面画三角形，沿 Y 拉伸
-for (y = [base_width * 0.15, base_width * 0.85])
-  translate([0, y, 0])
-    rotate([90, 0, 0])
-      linear_extrude(height = rib_thickness, center = true)
-        polygon([[-plate_thickness, 0], [rib_length, 0], [-plate_thickness, rib_height]]);
 `,
   },
   {
@@ -2273,66 +1448,17 @@ translate([0, 0, pot_z])
 `,
   },
   {
-    id: 45,
-    name: '多肉标签牌',
-    category: '园艺家居',
-    level: 'basic',
-    applies: '多肉/香草标签、花园插牌、样品标识牌',
-    idea: '整块 2D 轮廓（牌面 + 柄 + 尖头）一次拉伸，平放打印；牌面再挖一层浅凹槽方便书写',
-    points: [
-      '牌面、柄、尖头三段在 2D 里重叠 0.01，union 后没有接缝',
-      '尖头用 polygon 三角形，斜插进土里不易折断',
-      '凹槽用 offset 圆角方框，margin 用 min() 夹紧保证不超边',
-    ],
-    code: `/* [标签牌] */
-tag_height = 100; // [60:5:160]
-plate_width = 34; // [20:2:70]
-plate_height = 30; // [15:2:60]
-stake_width = 8; // [5:1:20]
-tip_length = 14; // [6:1:30]
-tag_thickness = 2; // [1.2:0.2:4]
-
-/* [书写面] */
-recess_depth = 0.6; // [0.2:0.1:1.5]
-recess_margin = 5; // [2:1:12]
-
-/* [Hidden] */
-$fn = 32;
-
-plate_bottom = tag_height - plate_height;
-// 凹槽内缩量上限：保证凹槽始终落在牌面内
-margin = min(recess_margin, min(plate_width, plate_height) / 2 - 3);
-
-module tag_2d() {
-  translate([-plate_width / 2, plate_bottom])
-    square([plate_width, plate_height]);
-  translate([-stake_width / 2, tip_length])
-    square([stake_width, plate_bottom - tip_length + 0.01]);
-  translate([-stake_width / 2, 0])
-    polygon([[0, tip_length], [stake_width, tip_length], [stake_width / 2, 0]]);
-}
-
-difference() {
-  linear_extrude(height = tag_thickness) tag_2d();
-  // 顶部浅凹槽：马克笔书写不打滑
-  translate([0, tag_height - plate_height / 2, tag_thickness - recess_depth])
-    linear_extrude(height = recess_depth + 1)
-      offset(r = 2)
-        square([plate_width - 2 * margin, plate_height - 2 * margin], center = true);
-}
-`,
-  },
-  {
     id: 46,
     name: '笔筒带手机槽',
     category: '桌面收纳',
     level: 'classic',
-    applies: '桌面笔筒 + 手机立槽、化妆刷筒、工具筒',
+    applies: '桌面笔筒 + 手机立槽、分格笔筒、化妆刷筒、工具筒',
     idea: '圆筒笔筒外挂两片竖直夹板：夹板间距 = 手机厚 + 间隙，底部用一块垫板把它们和筒壁连成一体',
     points: [
       '槽宽 gap = phone_thickness + slot_clearance，手机插进去不晃',
       '内夹板伸进筒壁 2mm、垫板横跨两片夹板，union 后是一体',
       '手机下沿落在垫板顶面 pad_height，不会漏到桌面',
+      '圆筒内做放射分格（原范例 21 技巧）：薄隔板 rotate 绕 Z 均布，长 = 2×内半径、从 bottom 起到口沿',
     ],
     code: `/* [笔筒] */
 cup_diameter = 85; // [50:5:140]
@@ -2373,56 +1499,6 @@ union() {
     cube([fin_thickness, slot_length, slot_height]);
   translate([fin2_x, -slot_length / 2, 0])
     cube([fin_thickness, slot_length, slot_height]);
-}
-`,
-  },
-  {
-    id: 47,
-    name: 'XYZ 校准块',
-    category: '桌面收纳',
-    level: 'basic',
-    applies: '打印机 XYZ 尺寸自检、孔径收缩对比、耗材公差快速验证',
-    idea: '20mm 立方体作为通用 XYZ 基准，中心通孔、侧面横槽、顶部公差柱各测一项尺寸特征',
-    points: [
-      '20mm 立方体是通用 XYZ 基准，量外廓即可知道三轴是否准确',
-      '通孔测孔径收缩，横槽贯通侧壁测层间结合，顶部柱测外径',
-      '柱径与槽深都用 min() 夹紧，参数拉到极限也不会粘连或切穿',
-    ],
-    code: `/* [基准块] */
-cube_size = 20; // [10:1:50]
-
-/* [孔与槽] */
-hole_diameter = 8; // [4:1:16]
-slot_width = 2; // [1:0.5:6]
-slot_depth = 8; // [3:1:20]
-
-/* [公差柱] */
-pin_count = 3; // [0:1:6]
-pin_diameter = 4; // [2:0.5:8]
-pin_height = 10; // [5:1:25]
-
-/* [Hidden] */
-$fn = 64;
-
-difference() {
-  cube([cube_size, cube_size, cube_size]);
-  // 中心通孔
-  translate([cube_size / 2, cube_size / 2, -0.5])
-    cylinder(h = cube_size + 1, d = min(hole_diameter, cube_size - 4));
-  // 侧向横槽：检验层间结合与缝隙
-  translate([-1, cube_size / 2 - cube_size * 0.15, cube_size / 2 - slot_width / 2])
-    cube([min(slot_depth, cube_size - 2) + 1, cube_size * 0.3, slot_width]);
-}
-
-// 顶部公差柱：柱径按间距夹紧，避免相邻柱粘连；
-// Y 方向避开中心通孔，否则中间柱会悬在孔里成为独立零件
-for (i = [0 : pin_count - 1]) {
-  spacing = cube_size / (pin_count + 1);
-  d = min(pin_diameter, spacing * 0.7);
-  hole_r = min(hole_diameter, cube_size - 4) / 2;
-  pin_y = max(cube_size * 0.18, cube_size / 2 - hole_r - d / 2 - 1);
-  translate([spacing * (i + 1), pin_y, cube_size - 1])
-    cylinder(h = pin_height + 1, d = d);
 }
 `,
   },
@@ -2735,13 +1811,14 @@ difference() {
     name: '批头收纳座',
     category: '实用工具',
     level: 'basic',
-    applies: '六角/圆柄批头收纳、钻头座、螺丝刀头架',
+    applies: '六角/圆柄批头收纳、内六角扳手架、钻头座、螺丝刀头架',
     idea: '圆角矩形底座上开两排盲孔：一排 $fn=6 的六角孔插六角批头，一排圆孔插圆柄；孔深小于座高，底部留料托住批头',
     points: [
       '六角孔直接给 cylinder 的 $fn = 6，不用手算多边形',
       '两排各自均分：间距 = (长度 - 2×边距) / max(列数-1, 1)，列数为 1 时不除零',
       '盲孔深度用 min() 收敛到 base_height - 2，底部至少留 2mm 料',
       '圆角用 offset + linear_extrude，比 minkowski 快得多',
+      '内六角扳手架（原范例 38 技巧）同法：一排六角盲孔按序号等距、孔径 = 对边宽 + 0.2~0.4 逐级递增',
     ],
     code: `/* [底座] */
 base_length = 100; // [60:5:160]
@@ -3583,6 +2660,7 @@ union() {
       'z 小于 10 会根切，传动件用 12 齿以上；m 取 1.5~3，m 越小齿越细越难打',
       '中心距 a = m×(z1+z2)/2 是硬约束：两轴按 a 摆放才啮合；本例是拆解图，真正啮合要按 a 摆位',
       'part_spec 可声明 teeth（分度圆半径 m×z/2）与 center（两轴距离 a），引擎会实测复核',
+      '只做装饰不传动时才用梯形齿近似（每齿 4 点于齿根圆/齿顶圆间交替，原范例 28 技巧）；要真正啮合必须用本例渐开线',
     ],
     code: `${GEARS_CODE}
 
@@ -3713,6 +2791,68 @@ if (frame > 0) {
 }
 `,
   },
+  {
+    id: 69,
+    name: '体素地标塔（轮廓参数化）',
+    category: '体素造型',
+    level: 'advanced',
+    applies: '体素摩天楼、哈利法塔、埃菲尔铁塔、广州塔、电视塔、方块风地标摆件',
+    idea: '把目标轮廓先写成 r(z) 函数（高度→半径），再按体素网格采样：每列高度 = 包得住柱心的最高层',
+    points: [
+      '轮廓优先：动手前先在 design_plan 里定比例数字——高宽比、退台位置、尖塔占比',
+      '哈利法塔轮廓 = 塔身线性收腰 + 3 次大退台（半径×0.82）+ 顶部 20% 尖塔；换一条 r(z) 就是另一座塔',
+      '体素化 = 沿 z 对 r(z) 采样：每列高度 = 包得住柱心距中心距离的最高层，逐列递归（层数 ≤64）',
+      '规则网格相邻柱贴齐即流形（traps #26）；底座把 r(z) 放大 1.42 倍盖住对角，底面铺满成单实体',
+    ],
+    code: `/* [轮廓] */
+total_h = 180; // [100:10:260] 总高
+base_half = 10; // [6:1:24] 底边半宽
+taper_end = 0.55; // [0.3:0.05:0.8] 塔顶半径 / 塔底半径
+setbacks = 3; // [1:1:5] 大退台次数
+setback_ratio = 0.82; // [0.6:0.05:0.95] 每次退台倍率
+spire_frac = 0.2; // [0.08:0.02:0.35] 尖塔占总高比例
+
+/* [体素] */
+voxel = 4; // [2:0.5:8] 体素边长
+levels = 36; // [18:2:64] 纵向采样层数
+
+/* [Hidden] */
+$fn = 24;
+
+// ---------- 轮廓 r(z) ----------
+body_h = total_h * (1 - spire_frac);
+level_h = total_h / levels;
+
+function body_r(z) =
+  base_half * (1 - (1 - taper_end) * z / body_h)
+  * pow(setback_ratio, min(setbacks, floor(z / (body_h / setbacks))));
+
+function spire_r(z) =
+  base_half * taper_end * pow(setback_ratio, setbacks)
+  * (1 - (z - body_h) / (total_h - body_h));
+
+function profile_r(z) =
+  z <= base_half * 0.8 ? base_half * 1.42   // 底座盖住对角，底层满格
+  : (z <= body_h ? body_r(z) : spire_r(z));
+
+// ---------- 体素化采样 ----------
+grid = ceil(2 * base_half / voxel);
+
+function col_levels(r, k) =
+  k >= levels ? levels
+  : (r <= profile_r((k + 0.5) * level_h) ? col_levels(r, k + 1) : k);
+
+for (i = [0 : grid - 1])
+  for (j = [0 : grid - 1]) {
+    x0 = -grid * voxel / 2 + i * voxel;
+    y0 = -grid * voxel / 2 + j * voxel;
+    r = norm([x0 + voxel / 2, y0 + voxel / 2]);
+    n = col_levels(r, 0);
+    if (n > 0)
+      translate([x0, y0, 0]) cube([voxel, voxel, n * level_h]);
+  }
+`,
+  },
 ];
 
 /** 全部分类（按首个出现顺序）。 */
@@ -3723,13 +2863,13 @@ export const EXAMPLE_CATEGORIES: string[] = [...new Set(EXAMPLES.map((e) => e.ca
  *
  * 选取标准：模板复用率高、技巧不可替代，且每个大类至少保留 1 个。
  * 其余范例在 prompt 里只保留「名称 + 适用 + 思路」的目录条目——模型知道
- * 这类东西有解、知道思路，但不必把 68 份源码全文塞进上下文。
+ * 这类东西有解、知道思路，但不必把全部源码全文塞进上下文。
  * 螺旋楼梯（64）、六边形壁架（51）等技巧与其它范例重复的只留目录条目。
  * 源码仍然完整地留在 UI 范例库，用户一键即可载入。
  */
 export const PROMPT_FULL_IDS: readonly number[] = [
-  1, 2, 3, 3.5, 6, 7, 10, 11, 16, 17, 20, 22, 30,
-  37, 41, 49, 54, 57, 58, 59, 60, 62, 63, 66,
+  1, 2, 3, 5, 6, 7, 10, 11, 16, 17, 20,
+  37, 49, 57, 58, 59, 60, 62, 63, 66, 69,
 ];
 
 const PROMPT_FULL = new Set(PROMPT_FULL_IDS);
@@ -3750,7 +2890,6 @@ export function getExample(id: number): ModelingExample | undefined {
  * 生成拼进 system prompt 的范例文本。
  *  - PROMPT_FULL_IDS 里的：编号 + 标题 + 适用 + 思路 + 关键点 + 完整源码
  *  - 其余：编号 + 标题 + 适用 + 思路（目录条目，不给源码）
- * id 为 3.5 的肾形范例在 prompt 里显示为"范例 3b"。
  */
 export function examplesToPromptText(): string {
   const header = `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -3765,7 +2904,7 @@ export function examplesToPromptText(): string {
 按需要选型即可。范例只是起点：复杂件可以组合多个范例、拆成多件、写到六七百行。`;
 
   const blocks = EXAMPLES.map((e) => {
-    const idLabel = e.id === 3.5 ? '3b' : String(e.id);
+    const idLabel = String(e.id);
     if (!PROMPT_FULL.has(e.id)) {
       return `范例 ${idLabel}：${e.name}（${e.category}·${LEVEL_LABELS[e.level]}）｜目录
 适用：${e.applies}

@@ -7,6 +7,7 @@
 
 import { compile } from '../engine/compiler.js';
 import type { CompileResult, MeshSummary, ParamValues } from '../engine/types.js';
+import { analyzeMesh } from '../engine/mesh-structure.js';
 import {
   describeSpecReport,
   measurePartSpecs,
@@ -79,6 +80,37 @@ export function outcomeFromCompile(
     if (maxDim > 2000) problems.push(`[几何] 尺寸异常：最大边 ${maxDim.toFixed(1)}mm > 2000mm`);
     if (minDim > 0 && minDim < 0.5) problems.push(`[几何] 尺寸异常：最小边 ${minDim.toFixed(2)}mm < 0.5mm`);
     if (result.summary.volumeMm3 <= 0.001) problems.push('[几何] 体积为 0：模型可能是退化面片');
+  }
+
+  // 网格结构审计（traps #21）：编译成功不代表结构正确——
+  // 破面（非流形）、埋床/悬空、未声明的多实体都会被拦下，带实测值回灌给模型修复
+  let structure: { openEdges: number; components: number; minZ: number } | null = null;
+  if (result.ok && !result.empty && result.format === 'stl' && result.output) {
+    try {
+      structure = analyzeMesh(result.output);
+    } catch {
+      structure = null; // STL 解析失败按无审计处理，问题由编译结果兜底
+    }
+  }
+  if (structure) {
+    if (structure.openEdges > 0) {
+      problems.push(
+        `[结构] 网格有 ${structure.openEdges} 条开放边（破面/自交/共面贴死），切片会出错：` +
+          '避免布尔件只在尖角/棱边/平面上相切，重叠至少 0.2mm'
+      );
+    }
+    if (structure.minZ < -0.1) {
+      problems.push(`[结构] 模型最低点 ${structure.minZ.toFixed(2)}mm 低于热床，埋入床面：请整体抬升或裁掉床面以下部分`);
+    } else if (structure.minZ > 0.2) {
+      problems.push(`[结构] 模型最低点 ${structure.minZ.toFixed(2)}mm 悬空：至少一个足部/底面要落在 z=0 热床上`);
+    }
+    const declaresParts = partSpec.some((s) => s.kind === 'parts');
+    if (structure.components > 1 && !declaresParts) {
+      problems.push(
+        `[结构] 网格由 ${structure.components} 个互不相连的实体组成：` +
+          '多件装配必须分列摆开、件与件留 ≥0.5mm 间隙，并在 part_spec 声明 parts 检查'
+      );
+    }
   }
 
   if (summaryText) notes.push(`[网格] ${summaryText}`);

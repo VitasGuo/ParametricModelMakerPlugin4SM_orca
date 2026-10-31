@@ -48,6 +48,17 @@ describe('buildSystemPrompt', () => {
     expect(buildSystemPrompt()).toContain('/* [Group] */');
   });
 
+  it('路由与特征防退化（beta.11 回归）：多格禁止单腔、地标塔不平移成中式塔', () => {
+    const p = buildSystemPrompt();
+    // 结构缺失防退化（用户案例：多格收纳盒 → 普通盒子）
+    expect(p).toContain('禁止退化成单腔盒子');
+    expect(p).toContain('特征清单');
+    // 创意泛化防错位（用户案例：体素哈利法塔 → 佛塔）
+    expect(p).toContain('轮廓优先');
+    expect(p).toContain('不要把哈利法塔/铁塔做成中式楼阁塔');
+    expect(p).toContain('范例 69');
+  });
+
   it('体积受控：范例分两级注入，整体不超过 80k 字符', () => {
     const p = buildSystemPrompt();
     expect(p.length).toBeLessThan(80_000);
@@ -60,7 +71,7 @@ describe('范例 prompt 分级', () => {
 
   it('每个范例都有条目（附源码或目录），模型知道库里有它', () => {
     for (const e of EXAMPLES) {
-      const label = e.id === 3.5 ? '3b' : String(e.id);
+      const label = String(e.id);
       expect(text, `ex${label}`).toContain(`范例 ${label}：`);
     }
     const briefCount = EXAMPLES.filter((e) => !PROMPT_FULL_IDS.includes(e.id)).length;
